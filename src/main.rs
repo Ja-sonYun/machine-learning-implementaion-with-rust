@@ -1,26 +1,48 @@
-use rand::Rng;
-use std::mem::{self, MaybeUninit};
+pub mod utils {
+    pub mod activations {
+        use crate::utils::types::*;
+        use rand::Rng;
+        // Sigmoid / Tanh
+        pub fn xavier_initialization(fan_in: Dimension, fan_out: Dimension) -> Weight
+        {
+            let mut rng = rand::thread_rng();
+            rng.gen_range((fan_in as f64)..(fan_out as f64)) as f64 / (fan_in as f64).sqrt()
+        }
 
-type Dimension = i64;
-type Weight = f64;
-type Bias = f64;
-type Error = f64;
-type Input = f64;
+        // ReLU
+        pub fn he_initialization(fan_in: Dimension, fan_out: Dimension) -> Weight
+        {
+            let mut rng = rand::thread_rng();
+            rng.gen_range((fan_in as f64)..(fan_out as f64)) as f64 / ((fan_in / 2) as f64).sqrt()
+        }
+    }
+    pub mod types {
+        pub type Dimension = i64;
+        pub type Weight = f64;
+        pub type Bias = f64;
+        pub type Error = f64;
+        pub type Input = f64;
+    }
+}
+use std::mem::MaybeUninit;
+use std::any::{Any};
+use utils::types::*;
+use utils::activations::*;
 
-#[derive(Clone, Copy)]
-struct Neuron<const D: usize>
+#[derive(Clone, Debug)]
+struct Neuron<const OUT: usize>
 {
     input: Weight,
     past_z: Weight,
-    weights: [Weight; D], // weights where routing from origins
+    weights: [Weight; OUT], // weights where routing from origins
     bias: Bias,
 }
 
-impl<const D: usize> Neuron <D>
+impl<const OUT: usize> Neuron<OUT>
 {
-    fn new(X: Weight, bias: Bias) -> Neuron<D>
+    fn new(X: Weight, bias: Bias) -> Neuron<OUT>
     {
-        Neuron { input: X, past_z: 0., weights: [0.; D], bias: bias }
+        Neuron { input: X, past_z: 0., weights: [0.;OUT], bias: bias }
     }
 
     fn get_Y(&self, index: usize) -> Weight
@@ -36,7 +58,7 @@ impl<const D: usize> Neuron <D>
     fn update_z(&mut self, weight_sum: Weight)
     {
         self.past_z = self.input;
-        self.input = self.sigmoid(self.bias + weight_sum);
+        self.input = Neuron::<OUT>::sigmoid(self.bias + weight_sum);
         println!("{} ", self.input);
     }
 
@@ -48,53 +70,72 @@ impl<const D: usize> Neuron <D>
         }
     }
 
-    fn sigmoid(self, x: f64) -> f64
+    fn sigmoid(x: f64) -> f64
     {
         1. / (1. + (-x).exp())
     }
 }
 
-struct Layer<const D: usize>
+#[derive(Debug)]
+struct Model
 {
-    neurons: [Neuron<D>; D],
+    name: &'static str,
+    layers: Vec<Box<dyn Any>>,
+}
+
+impl Model {
+    fn new(name: &'static str) -> Model {
+        Model { name: name, layers: Vec::new() }
+    }
+
+    fn add_layer(&mut self, layer: Box<dyn Any>) {
+        self.layers.push(layer);
+        // let ll = self.layers[0].downcast();
+        // println!("{:?}", self.layers[0].downcast::<Layer>());
+    }
+}
+
+trait LayerBlock {
+    type _Layer;
+    type _Neurons;
+    const IN: usize;
+    const OUT: usize;
+    fn new(input: Option<Vec<Input>>, name: Option<&'static str>) -> Self::_Layer;
+}
+
+#[derive(Debug)]
+struct Layer<const IN: usize, const OUT: usize>
+{
+    name: &'static str,
+    neurons: [Neuron<OUT>; IN],
     dimension: Dimension,
 }
 
-impl<const D: usize> Layer <D>
-{
-    fn new(input: Option<Vec<Input>>) -> Layer<D>
-    {
-        match &input {
-            Some(val) => {
-                if val.len() != D {
-                    panic!("Input Dimension Mismatch!")
-                }
-            },
-            None => {},
-        };
-        let neurons: [Neuron<D>; D] = {
-            let mut neurons: [MaybeUninit<Neuron<D>>; D] = unsafe {
-                MaybeUninit::uninit().assume_init()
-            };
-            for i in 0..D as usize
-            {
-                let x = match &input {
+impl<const IN: usize, const OUT: usize> LayerBlock for Layer<IN, OUT> {
+    type _Layer = Layer<IN, OUT>;
+    type _Neurons = [Neuron<OUT>; IN];
+    const IN: usize = IN;
+    const OUT: usize = OUT;
+    fn new(input: Option<Vec<Input>>, name: Option<&'static str>) -> Layer<IN, OUT> {
+        let neurons = unsafe {
+            let mut neurons: [MaybeUninit<Neuron<OUT>>; IN] = MaybeUninit::uninit().assume_init();
+            for i in 0..IN as usize {
+                let mut neuron = Neuron::<OUT>::new(match &input {
                     None => 0.,
                     Some(val) => val[i],
-                };
-                neurons[i] = MaybeUninit::new(Neuron::<D>::new(x, 0.));
+                }, 0.);
+                neuron.init_weights(xavier_initialization, IN as Dimension, OUT as Dimension);
+                std::ptr::write(neurons[i].as_mut_ptr(), neuron);
             }
-            unsafe { mem::transmute_copy::<_, [Neuron<D>; D]>(&neurons) }
+            std::mem::transmute_copy::<_, [Neuron<OUT>; IN]>(&neurons)
         };
 
-        Layer { neurons: neurons, dimension: D as Dimension }
+        Layer { name: name.unwrap(), neurons: neurons, dimension: IN as Dimension }
     }
-
-    fn next_new(&mut self) -> Layer<D>
-    {
-        self.weight_initialize(D as i64);
-        Layer::new(None)
-    }
+    // fn next_new(&mut self) -> Layer
+    // {
+    //     self.weight_initialize(self.dimension as i64);
+    // }
 
     // MSE
     // fn loss(&self) -> Error
@@ -108,63 +149,51 @@ impl<const D: usize> Layer <D>
     //     err / Error::from(self.dimension as f64)
     // }
 
-    // Sigmoid / Tanh
-    fn xavier_initialization(fan_in: Dimension, fan_out: Dimension) -> Weight
-    {
-        let mut rng = rand::thread_rng();
-        rng.gen_range((fan_in as f64)..(fan_out as f64)) as f64 / (fan_in as f64).sqrt()
-    }
 
-    // ReLU
-    fn he_initialization(fan_in: Dimension, fan_out: Dimension) -> Weight
-    {
-        let mut rng = rand::thread_rng();
-        rng.gen_range((fan_in as f64)..(fan_out as f64)) as f64 / ((fan_in / 2) as f64).sqrt()
-    }
+    // fn forward(&mut self, next_layer: &mut Layer)
+    // {
+    //     for i in 0..next_layer.dimension as usize
+    //     {
+    //         let mut weight_sum: Weight = 0.;
 
-    fn weight_initialize(&mut self, fan_out: Dimension)
-    {
-        for i in 0..self.dimension as usize
-        {
-            self.neurons[i].init_weights(Layer::<D>::xavier_initialization, self.dimension, fan_out);
-        }
-    }
+    //         // sum of weight(index j) that heading to i
+    //         for j in 0..self.dimension as usize
+    //         {
+    //             weight_sum = self.neurons[j].get_Y(i) + weight_sum;
+    //         }
 
-    fn forward(&mut self, next_layer: &mut Layer<D>)
-    {
-        for i in 0..next_layer.dimension as usize
-        {
-            let mut weight_sum: Weight = 0.;
-
-            // sum of weight(index j) that heading to i
-            for j in 0..self.dimension as usize
-            {
-                weight_sum = self.neurons[j].get_Y(i) + weight_sum;
-            }
-
-            next_layer.neurons[i].update_z(weight_sum);
-            // z = b + sum_{N}{i=1} a_i * w_i
-        }
-    }
+    //         next_layer.neurons[i].update_z(weight_sum);
+    //         // z = b + sum_{N}{i=1} a_i * w_i
+    //     }
+    // }
 }
 
-struct A<const L: usize>
-{
-    layer: [f64; L]
+#[derive(Debug)]
+struct A<const D: usize>
+{}
+
+trait AA {
 }
-impl<const L: usize> A<L>
-{
-    fn new() -> A<L>
-    {
-        A { layer: [0.; L] }
+
+impl<const D: usize> AA for A<D>{
+    fn new() -> A<D> {
+        A {}
     }
 }
 
 fn main()
 {
-    let input = vec![0.1, 0.2, 0.5];
+    let mut aaa: Vec<Box<dyn Any>> = Vec::new();
+    let mut a = A::<2>::new();
+    let ap: *mut &impl AA = &mut a;
+    aaa.push(Box::new(a));
+    println!("{:?}", ap);
 
-    let mut layer = Layer::<4>::new(Some(input));
+    let input = Some(vec![0.1, 0.2, 0.5]);
+
+    let mut layer = Layer::<3, 4>::new(input, Some("new"));
+    let mut newModel = Model::new("new");
+    newModel.add_layer(Box::new(layer));
     // layer.forward(&mut layer1);
     println!("Hello, world!");
 
