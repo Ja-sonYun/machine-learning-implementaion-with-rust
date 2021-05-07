@@ -77,21 +77,25 @@ impl<const OUT: usize> Neuron<OUT>
 }
 
 #[derive(Debug)]
-struct Model
+struct Model<const DEP: usize>
 {
     name: &'static str,
     layers: Vec<Box<dyn Any>>,
+    structure: Option<[usize;DEP]>,
 }
 
-impl Model {
-    fn new(name: &'static str) -> Model {
-        Model { name: name, layers: Vec::new() }
+impl<const DEP: usize> Model<DEP> {
+    fn new(name: &'static str) -> Model<DEP> {
+        Model { name: name, layers: Vec::new(), structure: None }
     }
 
-    fn add_layer(&mut self, layer: Box<dyn Any>) {
-        self.layers.push(layer);
+    fn add_layer<const IN: usize, const OUT: usize>(&mut self, input: Option<Vec<Input>>, name: Option<&'static str>) {
+        let mut new = &Layer::<IN, OUT>::new(input, name) as &dyn Any;
+        const A: [usize;2] = [IN, OUT];
+
+        // self.layers.push(Box::new(Layer::<IN, OUT>::new(input, name)));
         // let ll = self.layers[0].downcast();
-        // println!("{:?}", self.layers[0].downcast::<Layer>());
+        println!("{:?}", new.downcast_ref::<Layer<IN, OUT>>());
     }
 }
 
@@ -173,28 +177,36 @@ struct A<const D: usize>
 {}
 
 trait AA {
+    type Item;
+    fn new() -> Self::Item;
+    fn get_d<const A: usize>(&self) ->usize;
 }
 
 impl<const D: usize> AA for A<D>{
+    type Item = A<D>;
     fn new() -> A<D> {
         A {}
+    }
+    fn get_d<const A: usize>(&self) ->usize {
+        A * D
     }
 }
 
 fn main()
 {
-    let mut aaa: Vec<Box<dyn Any>> = Vec::new();
+    let mut aaa: Vec<&dyn Any> = Vec::new();
     let mut a = A::<2>::new();
-    let ap: *mut &impl AA = &mut a;
-    aaa.push(Box::new(a));
-    println!("{:?}", ap);
+    // aaa.push(&a);
+    println!("{:?}", a.get_d::<2>());
+    // println!("{:?}", aaa[0].downcast_ref::<AA>());
 
     let input = Some(vec![0.1, 0.2, 0.5]);
 
-    let mut layer = Layer::<3, 4>::new(input, Some("new"));
-    let mut newModel = Model::new("new");
-    newModel.add_layer(Box::new(layer));
+    let mut newModel = Model::<2>::new("new");
+    const A: [usize;2] = [1, 2];
+
+    newModel.add_layer::<{A[0]}, 3>(input, Some("new"));
     // layer.forward(&mut layer1);
-    println!("Hello, world!");
+    // println!("Hello, world!{}", L[0]);
 
 }
