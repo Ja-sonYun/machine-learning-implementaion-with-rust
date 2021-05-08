@@ -1,7 +1,15 @@
 pub mod utils {
     pub mod maths {
+        // use std::collections::HashMap;
+        // pub struct Expression<EXP: Fn(Vec<f64>) -> f64> {
+        //     exp: EXP,
+        //     map: HashMap<String, i64>
+        // }
+        // impl<EXP: Fn(Vec<f64>) -> f64> Expression<EXP> {
+        //     fn new()
+        // }
         pub mod algebra {
-            use crate::utils::maths::derivative;
+            // use crate::utils::maths::derivative;
             #[derive(Debug, Clone)]
             enum Element<T> {
                 Zero,
@@ -46,13 +54,16 @@ pub mod utils {
                 // }
             }
         }
-        pub fn derivative(f: fn(f64)->f64) -> impl Fn(f64) -> f64 {
-            // let df = derivative(|x| x.powi(2));
-            // println!("{}", df(3.));
-            let h = 1e-6;
-            move |x: f64| (f(x+h) - f(x)) / h
-        }
+        // pub fn derivative(f: fn(f64)->f64) -> impl Fn(f64) -> f64 {
+        //     // let df = derivative(|x| x.powi(2));
+        //     // println!("{}", df(3.));
+        //     let h = 1e-6;
+        //     move |x: f64| (f(x+h) - f(x)) / h
+        // }
         pub fn numerical_derivative(f: fn(&Vec<f64>)->f64, x: &mut Vec<f64>) -> Vec<f64> {
+            // let pf = |v: &Vec<f64>|->f64 { ( v[3]*v[0] ) + ( v[0]*v[1]*v[3] ) + ( 3.*v[2] ) + ( v[3]*v[1].powi(2) ) };
+            // let mut vec: Vec<f64> = vec![2., 3., 1., 4.];
+            // println!("{:?}", numerical_derivative(pf, &mut vec));
             let delta_x = 1e-4;
             let mut grad = vec![0.; x.len()];
 
@@ -87,21 +98,34 @@ pub mod utils {
         // Sigmoid / Tanh
         pub fn xavier_initializer(fan_in: Dimension, fan_out: Dimension) -> Weight
         {
-            rand()
+            // rand()
+                1.
         }
 
         // ReLU
         pub fn he_initializer(fan_in: Dimension, fan_out: Dimension) -> Weight
         {
-            rand()
+            // rand()
+                1.
         }
     }
     pub mod activations {
         pub fn sigmoid(x: f64) -> f64
         {
-            1. / (1. + (-x).exp())
+            // 1. / (1. + (-x).exp())
+            x
         }
+    }
 
+    pub mod cost {
+        use crate::utils::types::Error;
+
+        pub fn MSE(target: f64, output: f64) -> Error {
+            (target - output).powi(2) / 2.
+        }
+        pub fn d_MSE(vec: &Vec<f64>) -> Error {
+            -((vec[0]).powi(2) / 2.)
+        }
     }
     pub mod types {
         pub type Dimension = i64;
@@ -114,47 +138,59 @@ pub mod utils {
 use utils::types::*;
 use utils::activations::*;
 use utils::initializer::*;
+use utils::cost::*;
+use utils::maths::*;
 
 #[derive(Clone, Debug)]
-struct Neuron
-{
-    input: Weight,
-    past_z: Weight,
-    weights: Vec<Weight>, // weights where routing from origins
-    bias: Bias,
+struct Neuron {
+    input: NumOrZeroF64,
+    z: Weight,              // summed of weights
+    h: Weight,              // value that wrapped by activation func
+    weights: Vec<Weight>,   // weights where routing from origins
+    bias: Bias,             // bias, TODO: toggle this
+    loss: Error,            // local loss
 }
 
-impl Neuron
-{
-    fn new(X: Weight, bias: Bias, dim: Dimension) -> Neuron
-    {
-        Neuron { input: X, past_z: 0., weights: vec![0.; dim as usize] , bias: bias }
+#[derive(Debug, Clone, Copy)]
+enum NumOrZeroF64 {
+    Num(f64),
+    Zero,
+}
+impl NumOrZeroF64 {
+    fn reveal(self) -> f64 {
+        match self {
+            NumOrZeroF64::Num(x) => x,
+            _ => 0.,
+        }
     }
+}
 
-    fn get_Y(&self, index: usize) -> Weight
-    {
-        self.weights[index] * self.input
-    }
-
-    fn local_err(&self) -> Error
-    {
-        (self.past_z - self.input).powi(2) // int power
-    }
-
-    fn update_z(&mut self, weight_sum: Weight)
-    {
-        self.past_z = self.input;
-        self.input = sigmoid(self.bias + weight_sum);
-    }
-
-    fn init_weights(&mut self, init_f: fn(Dimension, Dimension)->Weight, dimension: Dimension, fan_out: Dimension)
-    {
-        for i in 0..fan_out as usize
-        {
-            self.weights[i] = init_f(dimension, fan_out);
+impl Neuron {
+    fn new(x: NumOrZeroF64, bias: Bias, fan_in: Dimension, fan_out: Dimension) -> Neuron {
+        Neuron {
+            input: x,
+            z: 0.,
+            h: x.reveal(),
+            weights: (0..fan_out).map(|_| he_initializer(fan_in, fan_out)).collect(),
+            bias: bias,
+            loss: 0.
         }
     }
 
+    // W * x
+    fn get_wx(&self, index: usize) -> Weight {
+        self.weights[index] * self.h
+    }
+
+    fn get_loss(&mut self) -> Error {
+        self.loss = MSE(self.input.reveal(), self.z);
+        self.loss
+    }
+
+    fn update_z(&mut self, weight_sum: Weight) {
+        self.z = self.bias + weight_sum;
+        self.h = sigmoid(self.z);
+    }
 }
 
 #[derive(Debug)]
@@ -163,42 +199,72 @@ struct Model
     name: &'static str,
     layers: Vec<Layer>,
     layer_size: usize,
+    cost: Error,
 }
 
 impl Model {
     fn new(name: &'static str) -> Model {
-        Model { name: name, layers: Vec::new(), layer_size: 0 }
+        Model { name: name, layers: Vec::new(), layer_size: 0, cost: 0. }
     }
     fn push_layer(&mut self, layer: Layer) {
         self.layers.push(layer);
         self.layer_size = self.layer_size + 1;
     }
-    fn add_layer(&mut self, fan_in: Dimension, fan_out: Dimension, input: Option<Vec<Input>>, name: Option<&'static str>) {
-        self.push_layer(Layer::new(fan_in, fan_out, input, name));
+    fn add_layer(&mut self, fan_in: Dimension, fan_out: Dimension, layer: LAYER, name: Option<&'static str>) {
+        self.push_layer(Layer::new(fan_in, fan_out, layer, name));
     }
     fn forward_propagation(&mut self) {
+        // loop layers
         for i in 0..(self.layer_size-1) {
-            for k in 0..self.layers[i].fan_out as usize {
+            // loop each neurons
+            for k in 0..self.layers[i+1].neurons.len() as usize {
                 if self.layers[i].fan_out != self.layers[i+1].fan_in {
                     panic!("layer dimension mismatch!");
                 }
                 let mut weight_sum: Weight = 0.;
-                for j in 0..self.layers[i].fan_in as usize {
-                    weight_sum = self.layers[i].neurons[j].get_Y(k) + weight_sum;
+                // loop for get sum of neuron's weights
+                for j in 0..self.layers[i].neurons.len() as usize {
+                    weight_sum = self.layers[i].neurons[j].get_wx(k) + weight_sum;
                 }
                 self.layers[i+1].neurons[k].update_z(weight_sum);
             }
         }
+        // loop for get total loss and update local losses if its output layer
+        if let LAYER::OUT(_) = self.layers[self.layer_size - 1]._type {
+            for neuron in &mut self.layers[self.layer_size - 1].neurons {
+                self.cost = self.cost + neuron.get_loss();
+            }
+        }
     }
     fn back_propagation(&mut self) {
-
+        println!("{:?}", self.layers[self.layer_size-1].neurons);
+        for neuron in &self.layers[self.layer_size-1].neurons {
+            // calculate E_total
+            let mut target_output: Vec<f64> = vec![neuron.input.reveal() - neuron.z];
+            let E_total = numerical_derivative(d_MSE, &mut target_output);
+            println!("E_total {:?}", E_total);
+        }
+        // for i in (self.layer_size)..1 {
+        //     for k in 0..self.layers[i].fan_in as usize {
+        //         self.layers[i-1]
+        //     }
+        // }
     }
 }
 
 trait LayerBlock {
     type _Layer;
-    type _Neurons;
-    fn new(fan_in: Dimension, fan_out: Dimension, input: Option<Vec<Input>>, name: Option<&'static str>) -> Self::_Layer;
+    fn new(fan_in: Dimension, fan_out: Dimension, layer: LAYER, name: Option<&'static str>) -> Self::_Layer;
+    fn init_neurons(fan_in: Dimension, fan_out: Dimension, layer: &LAYER) -> Vec<Neuron> {
+        let mut neurons: Vec<Neuron>;
+        // if this layer is input or hidden,
+        neurons = Vec::with_capacity(fan_in as usize);
+        for i in 0..layer.get_dim(fan_in, fan_out) as usize {
+            neurons.push(Neuron::new(layer.unwrap_with_index(i), 0., fan_in, fan_out));
+        }
+        // if this layer is output, which is doens't have nuerons
+        neurons
+    }
     // fn forward(&mut self, prev_layer: &Layer);
 }
 
@@ -209,87 +275,64 @@ struct Layer
     neurons: Vec<Neuron>,
     fan_in: Dimension,
     fan_out: Dimension,
+    _type: LAYER
 }
 
 impl LayerBlock for Layer {
     type _Layer = Layer;
-    type _Neurons = Vec<Neuron>;
-    fn new(fan_in: Dimension, fan_out: Dimension, input: Option<Vec<Input>>, name: Option<&'static str>) -> Layer {
-        // use input.len() as dimension
-        let mut neurons = Vec::with_capacity(fan_in as usize);
-        for i in 0..fan_in as usize {
-            let mut neuron = Neuron::new(match &input {
-                None => 0.,
-                Some(val) => val[i],
-            }, 0., fan_out);
-            neuron.init_weights(xavier_initializer, fan_in, fan_out);
-            neurons.push(neuron);
+    fn new(fan_in: Dimension, fan_out: Dimension, layer: LAYER, name: Option<&'static str>) -> Layer {
+        Layer {
+            name: name.unwrap(),
+            neurons: Layer::init_neurons(fan_in, fan_out, &layer),
+            fan_in: fan_in,
+            fan_out: fan_out,
+            _type: layer
         }
-
-        Layer { name: name.unwrap(), neurons: neurons, fan_in: fan_in, fan_out: fan_out }
     }
-
-    // fn forward(&mut self, prev_layer: &Layer) {
-    //     for i in 0..self.fan_out as usize
-    //     {
-    //         let mut weight_sum: Weight = 0.;
-
-    //         // sum of weight(index j) that heading to i
-    //         for j in 0..self.fan_in as usize
-    //         {
-    //             weight_sum = self.neurons[j].get_Y(i) + weight_sum;
-    //         }
-
-    //         // self.next.unwrap().neurons[i].update_z(weight_sum);
-    //         // z = b + sum_{N}{i=1} a_i * w_i
-    //     }
-    // }
-    // fn next_new(&mut self) -> Layer
-    // {
-    //     self.weight_initialize(self.dimension as i64);
-    // }
-
-    // MSE
-    // fn loss(&self) -> Error
-    // {
-    //     let mut err: Error = 0.;
-    //     for neuron in self.neurons.clone()
-    //     {
-    //         err += neuron.local_err();
-    //     }
-
-    //     err / Error::from(self.dimension as f64)
-    // }
-
-
-    // fn forward(&mut self, next_layer: &mut Layer)
-    // {
-    //     for i in 0..next_layer.dimension as usize
-    //     {
-    //         let mut weight_sum: Weight = 0.;
-
-    //         // sum of weight(index j) that heading to i
-    //         for j in 0..self.dimension as usize
-    //         {
-    //             weight_sum = self.neurons[j].get_Y(i) + weight_sum;
-    //         }
-
-    //         next_layer.neurons[i].update_z(weight_sum);
-    //         // z = b + sum_{N}{i=1} a_i * w_i
-    //     }
-    // }
 }
-use utils::maths::rand;
-use utils::maths::*;
+
+#[derive(Debug)]
+enum LAYER {
+    IN(Vec<Weight>),
+    OUT(Vec<Weight>),
+    HIDDEN,
+}
+impl LAYER {
+    fn unwrap(self) -> Option<Vec<Weight>> {
+        match self {
+            LAYER::IN(vw) | LAYER::OUT(vw) => Some(vw),
+            _ => None
+        }
+    }
+    fn unwrap_with_index(&self, i: usize) -> NumOrZeroF64 {
+        match &self {
+            LAYER::IN(vw) | LAYER::OUT(vw) => NumOrZeroF64::Num(vw[i]),
+            _ => NumOrZeroF64::Zero
+        }
+    }
+    fn get_dim(&self, fan_in: Dimension, fan_out: Dimension) -> Dimension {
+        match &self {
+            LAYER::IN(_) | LAYER::HIDDEN => fan_in,
+            LAYER::OUT(_) => fan_out
+        }
+    }
+}
 
 fn main()
 {
-    let input = Some(vec![0.1, 0.2, 0.5]);
+    let input = vec![0.1, 0.2, 0.5];
+    let output = vec![0.4, 0.3];
     let mut new_model = Model::new("test");
-    new_model.add_layer(3, 4, input, Some("first"));
-    new_model.add_layer(4, 2, None, Some("first"));
-    new_model.add_layer(2, 2, None, Some("first"));
-    new_model.forward_propagation();
+    // 0, 4
+    // 4, 3
+    // 3, 0
+    new_model.add_layer(3, 4, LAYER::IN(input), Some("first"));
+    new_model.add_layer(4, 4, LAYER::HIDDEN, Some("first"));
+    new_model.add_layer(4, 2, LAYER::HIDDEN, Some("first"));
+    new_model.add_layer(2, 0, LAYER::OUT(output), Some("first"));
+    // new_model.forward_propagation();
+    // new_model.back_propagation();
+    // new_model.back_propagation();
     println!("{:?}", new_model);
     // let mut newModel = Model::<2>::new("new");
     // const A: [usize;2] = [1, 2];
@@ -297,9 +340,6 @@ fn main()
     // newModel.add_layer::<{A[0]}, 3>(input, Some("new"));
     // layer.forward(&mut layer1);
     // println!("Hello, world!{}", L[0]);
-    let df = derivative(|x| 3.*x*(x).exp());
-    let pf = |v: &Vec<f64>|->f64 { ( v[3]*v[0] ) + ( v[0]*v[1]*v[3] ) + ( 3.*v[2] ) + ( v[3]*v[1].powi(2) ) };
-    let mut vec: Vec<f64> = vec![2., 3., 1., 4.];
-
-    println!("{:?}", numerical_derivative(pf, &mut vec));
+    // let mut vec: Vec<f64> = vec![, 4.];
+    // println!("{:?}", numerical_derivative(pf, &mut vec));
 }
