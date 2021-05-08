@@ -24,25 +24,23 @@ pub mod utils {
         pub type Input = f64;
     }
 }
-use std::mem::MaybeUninit;
-use std::any::{Any};
 use utils::types::*;
 use utils::activations::*;
 
 #[derive(Clone, Debug)]
-struct Neuron<const OUT: usize>
+struct Neuron
 {
     input: Weight,
     past_z: Weight,
-    weights: [Weight; OUT], // weights where routing from origins
+    weights: Vec<Weight>, // weights where routing from origins
     bias: Bias,
 }
 
-impl<const OUT: usize> Neuron<OUT>
+impl Neuron
 {
-    fn new(X: Weight, bias: Bias) -> Neuron<OUT>
+    fn new(X: Weight, bias: Bias, dim: Dimension) -> Neuron
     {
-        Neuron { input: X, past_z: 0., weights: [0.;OUT], bias: bias }
+        Neuron { input: X, past_z: 0., weights: vec![0.; dim as usize] , bias: bias }
     }
 
     fn get_Y(&self, index: usize) -> Weight
@@ -58,7 +56,7 @@ impl<const OUT: usize> Neuron<OUT>
     fn update_z(&mut self, weight_sum: Weight)
     {
         self.past_z = self.input;
-        self.input = Neuron::<OUT>::sigmoid(self.bias + weight_sum);
+        self.input = Neuron::sigmoid(self.bias + weight_sum);
         println!("{} ", self.input);
     }
 
@@ -77,60 +75,50 @@ impl<const OUT: usize> Neuron<OUT>
 }
 
 #[derive(Debug)]
-struct Model
+struct Model<const DEP: usize>
 {
     name: &'static str,
-    layers: Vec<Box<dyn Any>>,
+    layers: [Option<Layer>; DEP],
 }
 
-impl Model {
-    fn new(name: &'static str) -> Model {
-        Model { name: name, layers: Vec::new() }
+impl<const DEP: usize> Model<DEP> {
+    fn new(name: &'static str) -> Model<DEP> {
+        Model { name: name, layers: [None; DEP] }
     }
 
-    fn add_layer(&mut self, layer: Box<dyn Any>) {
-        self.layers.push(layer);
-        // let ll = self.layers[0].downcast();
-        // println!("{:?}", self.layers[0].downcast::<Layer>());
-    }
 }
 
 trait LayerBlock {
     type _Layer;
     type _Neurons;
-    const IN: usize;
-    const OUT: usize;
-    fn new(input: Option<Vec<Input>>, name: Option<&'static str>) -> Self::_Layer;
+    fn new(fan_in: Dimension, fan_out: Dimension, input: Option<Vec<Input>>, name: Option<&'static str>) -> Self::_Layer;
 }
 
 #[derive(Debug)]
-struct Layer<const IN: usize, const OUT: usize>
+struct Layer
 {
     name: &'static str,
-    neurons: [Neuron<OUT>; IN],
-    dimension: Dimension,
+    neurons: Vec<Neuron>,
+    fan_in: Dimension,
+    fan_out: Dimension,
 }
 
-impl<const IN: usize, const OUT: usize> LayerBlock for Layer<IN, OUT> {
-    type _Layer = Layer<IN, OUT>;
-    type _Neurons = [Neuron<OUT>; IN];
-    const IN: usize = IN;
-    const OUT: usize = OUT;
-    fn new(input: Option<Vec<Input>>, name: Option<&'static str>) -> Layer<IN, OUT> {
-        let neurons = unsafe {
-            let mut neurons: [MaybeUninit<Neuron<OUT>>; IN] = MaybeUninit::uninit().assume_init();
-            for i in 0..IN as usize {
-                let mut neuron = Neuron::<OUT>::new(match &input {
-                    None => 0.,
-                    Some(val) => val[i],
-                }, 0.);
-                neuron.init_weights(xavier_initialization, IN as Dimension, OUT as Dimension);
-                std::ptr::write(neurons[i].as_mut_ptr(), neuron);
-            }
-            std::mem::transmute_copy::<_, [Neuron<OUT>; IN]>(&neurons)
-        };
+impl LayerBlock for Layer {
+    type _Layer = Layer;
+    type _Neurons = Vec<Neuron>;
+    fn new(fan_in: Dimension, fan_out: Dimension, input: Option<Vec<Input>>, name: Option<&'static str>) -> Layer {
+        // use input.len() as dimension
+        let mut neurons = Vec::with_capacity(fan_in as usize);
+        for i in 0..fan_in as usize {
+            let mut neuron = Neuron::new(match &input {
+                None => 0.,
+                Some(val) => val[i],
+            }, 0., fan_out);
+            neuron.init_weights(xavier_initialization, fan_in, fan_out);
+            neurons.push(neuron);
+        }
 
-        Layer { name: name.unwrap(), neurons: neurons, dimension: IN as Dimension }
+        Layer { name: name.unwrap(), neurons: neurons, fan_in: fan_in, fan_out: fan_out }
     }
     // fn next_new(&mut self) -> Layer
     // {
@@ -168,33 +156,15 @@ impl<const IN: usize, const OUT: usize> LayerBlock for Layer<IN, OUT> {
     // }
 }
 
-#[derive(Debug)]
-struct A<const D: usize>
-{}
-
-trait AA {
-}
-
-impl<const D: usize> AA for A<D>{
-    fn new() -> A<D> {
-        A {}
-    }
-}
-
 fn main()
 {
-    let mut aaa: Vec<Box<dyn Any>> = Vec::new();
-    let mut a = A::<2>::new();
-    let ap: *mut &impl AA = &mut a;
-    aaa.push(Box::new(a));
-    println!("{:?}", ap);
-
     let input = Some(vec![0.1, 0.2, 0.5]);
 
-    let mut layer = Layer::<3, 4>::new(input, Some("new"));
-    let mut newModel = Model::new("new");
-    newModel.add_layer(Box::new(layer));
+    // let mut newModel = Model::<2>::new("new");
+    // const A: [usize;2] = [1, 2];
+
+    // newModel.add_layer::<{A[0]}, 3>(input, Some("new"));
     // layer.forward(&mut layer1);
-    println!("Hello, world!");
+    // println!("Hello, world!{}", L[0]);
 
 }
