@@ -163,12 +163,9 @@ pub mod utils {
                 pub fn elem_with_scalar<F: Fn(T, T)->T>(&self, with: T, cal_fn: F) -> Self {
                     // TODO: Refactoring this
                     let mut temp = Matrix::<T>::new(self._ny, self._nx);
-                    for y in 0..self._ny as usize {
-                        for x in 0..self._nx as usize {
-                            // println!("{}, {}", y, x);
-                            temp.n[y][x] = Element::Num(cal_fn(self.get(y as i64, x as i64), with));
-                        }
-                    }
+                    forfor!(self._ny, y, self._nx, x, {
+                        temp.set(y, x, cal_fn(self.get(y, x), with));
+                    });
                     temp
                 }
                 pub fn elemwise_cal<F: Fn(T, T)->T>(&self, with: Self, cal_fn: F) -> Self {
@@ -217,7 +214,7 @@ pub mod utils {
                 }
             }
             opt_impl!(Add, add, |a, b| a + b);
-            opt_impl!(Mul, mul, |a, b| a + b);
+            opt_impl!(Mul, mul, |a, b| a * b);
             opt_impl!(Sub, sub, |a, b| a - b);
             opt_impl!(Div, div, |a, b| a / b);
 
@@ -278,57 +275,70 @@ pub mod utils {
         }
     }
     pub mod activations {
-        pub fn sigmoid(x: f64) -> f64 {
-            1. / (1. + (-x).exp())
+        pub trait Activation {
+            fn feed_forward(&self, x: f64) -> f64;
+            fn back_propagation(&self,x: f64) -> f64;
         }
-        pub fn d_sigmoid_v(vec: &Vec<f64>) -> f64 {
-            vec[0] * ( 1. - vec[0] )
-        }
-        pub fn d_sigmoid(x: f64) -> f64 {
-            x * (1. - x)
-        }
-        pub fn ReLU(x: f64) -> f64 {
-            if 0. < x {
-                x
-            } else {
-                0.
+
+        #[allow(non_camel_case_types)]
+        pub struct Sigmoid;
+        impl Activation for Sigmoid {
+            fn feed_forward(&self, x: f64) -> f64 {
+                1. / (1. + (-x).exp())
+            }
+            fn back_propagation(&self, x: f64) -> f64 {
+                x * (1. - x)
             }
         }
-        pub fn d_ReLU(x: f64) -> f64 {
-            if 0. < x {
-                1.
-            } else {
-                0.
+
+        #[allow(non_camel_case_types)]
+        pub struct ReLU;
+        impl Activation for ReLU {
+            fn feed_forward(&self, x: f64) -> f64 {
+                if 0. < x {
+                    x
+                } else {
+                    0.
+                }
+            }
+            fn back_propagation(&self, x: f64) -> f64 {
+                if 0. < x {
+                    1.
+                } else {
+                    0.
+                }
             }
         }
-        pub fn Leaky_ReLU(x: f64) -> f64 {
-            if 0. < x {
-                x
-            } else {
-                x * 0.001
+
+        #[allow(non_camel_case_types)]
+        pub struct Leaky_ReLU;
+        impl Activation for Leaky_ReLU {
+            fn feed_forward(&self, x: f64) -> f64 {
+                if 0. < x {
+                    x
+                } else {
+                    x * 0.001
+                }
+            }
+            fn back_propagation(&self, x: f64) -> f64 {
+                if 0. < x {
+                    1.
+                } else {
+                    0.001
+                }
             }
         }
-        pub fn d_Leaky_ReLU(x: f64) -> f64 {
-            if 0. < x {
-                1.
-            } else {
-                0.001
+
+        #[allow(non_camel_case_types)]
+        pub struct END;
+        impl Activation for END {
+            fn feed_forward(&self, _: f64) -> f64 {
+                panic!("This won't be called normally. something is wrong!")
+            }
+            fn back_propagation(&self, _: f64) -> f64 {
+                panic!("This won't be called normally. something is wrong!")
             }
         }
-        // pub fn ELU(x: f64) -> f64 {
-        //     if 0. < x {
-        //         x
-        //     } else {
-        //         x.exp() - 1.
-        //     }
-        // }
-        // pub fn d_ELU(x: f64) -> f64 {
-        //     if 0. < x {
-        //         1.
-        //     } else {
-        //         x.exp()
-        //     }
-        // }
     }
 
     pub mod cost {
@@ -373,7 +383,7 @@ struct Neuron {
 }
 
 impl Neuron {
-    fn new(x: NumOrZeroF64, bias: Bias, fan_in: Dimension, fan_out: Dimension) -> Neuron {
+    fn new(x: NumOrZeroF64, bias: Bias, fan_in: Dimension, fan_out: Dimension) -> Self {
         Neuron {
             input: x,
             z: 0.,
@@ -395,32 +405,31 @@ impl Neuron {
         self.loss
     }
 
-    fn update_z(&mut self, weight_sum: Weight, act: fn(f64)->f64) {
-        self.z = self.bias + weight_sum;
-        self.o = act(self.z);
+    fn update_o(&mut self, z: Weight, o: Weight) {
+        self.z = z;
+        self.o = o;
     }
 }
 
-#[derive(Debug)]
-struct Model
+struct Model<'lng>
 {
     name: &'static str,
-    layers: Vec<Layer>,
+    layers: Vec<Layer<'lng>>,
     layer_size: usize,
     lr: f64,                // learning rate
     cost: Error,            // total loss
 }
 
-impl Model {
-    fn new(name: &'static str, lr: f64) -> Model {
+impl<'lng> Model<'lng> {
+    fn new(name: &'static str, lr: f64) -> Self {
         Model { name: name, layers: Vec::new(), layer_size: 0, lr: lr, cost: 0. }
     }
-    fn push_layer(&mut self, layer: Layer) {
+    fn push_layer(&mut self, layer: Layer<'lng>) {
         self.layers.push(layer);
         self.layer_size = self.layer_size + 1;
     }
-    fn add_layer(&mut self, fan_in: Dimension, fan_out: Dimension, layer: LAYER, name: Option<&'static str>) {
-        self.push_layer(Layer::new(fan_in, fan_out, layer, name));
+    fn add_layer(&mut self, fan_in: Dimension, fan_out: Dimension, layer: LAYER, activation: impl Activation + 'lng, name: Option<&'static str>) {
+        self.push_layer(Layer::new(fan_in, fan_out, layer, activation, name));
     }
     fn debug(&self) {
         println!("=================================");
@@ -457,7 +466,9 @@ impl Model {
                     for j in 0..self.layers[i].neurons.len() as usize {
                         weight_sum = self.layers[i].neurons[j].get_wx(k) + weight_sum;
                     }
-                    self.layers[i+1].neurons[k].update_z(weight_sum, sigmoid);
+                    let z = self.layers[i+1].neurons[k].bias + weight_sum;
+                    let o = self.layers[i].activation.feed_forward(z);
+                    self.layers[i+1].neurons[k].update_o(z, o);
                 }
             }
         }
@@ -474,7 +485,7 @@ impl Model {
                     // calculate (do / dz)
                     // let mut dv_o: Vec<f64> = vec![self.layers[l+1].neurons[n].o];
                     // let o = numerical_derivative(d_sigmoid, &mut dv_o)[0];
-                    let o = d_sigmoid(self.layers[l+1].neurons[n].o);
+                    let o = self.layers[l].activation.back_propagation(self.layers[l+1].neurons[n].o);
                     let E_total__o = E_total * o;
 
                     for w in 0..self.layers[l].neurons.len() {
@@ -495,7 +506,7 @@ impl Model {
 
                         // let mut dh_o: Vec<f64> = vec![self.layers[l+1].neurons[w].o];
                         // let h = numerical_derivative(d_sigmoid, &mut dh_o)[0];
-                        let h = d_sigmoid(self.layers[l+1].neurons[w].o);
+                        let h = self.layers[l].activation.back_propagation(self.layers[l+1].neurons[w].o);
                         self.layers[l].neurons[n].local_loss[w] = dE_total_W * self.layers[l].neurons[n].o * h;
 
                         self.layers[l].neurons[n].weights[w] = self.layers[l].neurons[n].weights[w] - (self.lr * self.layers[l].neurons[n].local_loss[w]);
@@ -507,9 +518,35 @@ impl Model {
 
 }
 
-trait LayerBlock {
-    type _Layer;
-    fn new(fan_in: Dimension, fan_out: Dimension, layer: LAYER, name: Option<&'static str>) -> Self::_Layer;
+// trait LayerList {
+// }
+// impl <ACT: Activation> LayerList for Layer<ACT> {
+// }
+
+struct Layer<'lng>
+{
+    name: &'static str,
+    neurons: Vec<Neuron>,
+    fan_in: Dimension,
+    fan_out: Dimension,
+    activation: Box<dyn Activation + 'lng>,
+    _type: LAYER
+}
+
+impl<'lng> Layer<'lng> {
+    fn new(fan_in: Dimension, fan_out: Dimension, layer: LAYER, activation: impl Activation + 'lng, name: Option<&'static str>) -> Self {
+        if !layer.check_size(fan_in) {
+            panic!("\n| vector and fan_in length mismatch!\n| at layer '{}', got {} size vector, expect {}\n", name.unwrap(), layer.get_len(), fan_in);
+        }
+        Layer {
+            name: name.unwrap(),
+            neurons: Layer::init_neurons(fan_in, fan_out, &layer),
+            fan_in: fan_in,
+            fan_out: fan_out,
+            activation: Box::new(activation),
+            _type: layer
+        }
+    }
     fn init_neurons(fan_in: Dimension, fan_out: Dimension, layer: &LAYER) -> Vec<Neuron> {
         let mut neurons: Vec<Neuron>;
         // if this layer is input or hidden,
@@ -520,33 +557,6 @@ trait LayerBlock {
         // if this layer is output, which is doens't have nuerons
         neurons
     }
-    // fn forward(&mut self, prev_layer: &Layer);
-}
-
-#[derive(Debug)]
-struct Layer
-{
-    name: &'static str,
-    neurons: Vec<Neuron>,
-    fan_in: Dimension,
-    fan_out: Dimension,
-    _type: LAYER
-}
-
-impl LayerBlock for Layer {
-    type _Layer = Layer;
-    fn new(fan_in: Dimension, fan_out: Dimension, layer: LAYER, name: Option<&'static str>) -> Layer {
-        if !layer.check_size(fan_in) {
-            panic!("\n| vector and fan_in length mismatch!\n| at layer '{}', got {} size vector, expect {}\n", name.unwrap(), layer.get_len(), fan_in);
-        }
-        Layer {
-            name: name.unwrap(),
-            neurons: Layer::init_neurons(fan_in, fan_out, &layer),
-            fan_in: fan_in,
-            fan_out: fan_out,
-            _type: layer
-        }
-    }
 }
 
 fn main()
@@ -554,29 +564,32 @@ fn main()
     let input = vec![0.1, 0.2, 0.5, 0.8, 0.7, 0.7, 0.2, 0.4];
     let output = vec![0.1, 0.2, 0.5, 0.8, 0.7, 0.7, 0.2, 0.4];
     let mut new_model = Model::new("test", 0.1);
-    new_model.add_layer(8, 9, IN(input), Some("input"));
-    new_model.add_layer(9, 4, HIDDEN, Some("input"));
-    new_model.add_layer(4, 3, HIDDEN, Some("input"));
-    new_model.add_layer(3, 8, HIDDEN, Some("input"));
-    new_model.add_layer(8, 0, OUT(output), Some("output"));
+    new_model.add_layer(8, 9, IN(input), Sigmoid, Some("input"));
+    new_model.add_layer(9, 4, HIDDEN, Sigmoid, Some("input"));
+    new_model.add_layer(4, 3, HIDDEN, Sigmoid, Some("input"));
+    new_model.add_layer(3, 8, HIDDEN, Sigmoid, Some("input"));
+    new_model.add_layer(8, 0, OUT(output), END, Some("output"));
 
-    // for i in (0..500) {
-    //     // if i % 10 == 0 && 0 != i {
-    //         println!("{:0} epoch, loss: {}", i, new_model.cost);
-    //     // }
-    //     let bp = new_model.cost;
-    //     new_model.forward_propagation();
-    //     // if bp < new_model.cost && bp != 0. {
-    //     //     println!("over");
-    //     //     break
-    //     // };
-    //     new_model.back_propagation();
-    // }
+    println!("{}", new_model.layers[0].activation.feed_forward(3.));
+    for i in (0..500) {
+        // if i % 10 == 0 && 0 != i {
+            println!("{:0} epoch, loss: {}", i, new_model.cost);
+        // }
+        let bp = new_model.cost;
+        new_model.forward_propagation();
+        // if bp < new_model.cost && bp != 0. {
+        //     println!("over");
+        //     break
+        // };
+        new_model.back_propagation();
+    }
     let mut w1 = Matrix::<f64>::new(3, 4);
     let mut w = Matrix::<f64>::new(3, 4);
     let mut a = Matrix::<f64>::new_scalar(4.);
     let mut b = Matrix::<f64>::new_scalar(2.);
-    w.set(1, 3, 1.);
+    w1.set(1, 3, 1.);
     w.set(1, 3, 4.);
+    println!("{}", w);
+    println!("{}", w1);
     println!("{}", w * w1);
 }
