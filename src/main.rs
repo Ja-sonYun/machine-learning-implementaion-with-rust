@@ -1,3 +1,16 @@
+#[macro_use]
+pub mod macros {
+    #[macro_export]
+    macro_rules! forfor {
+        ($y: expr, $yn: ident, $x: expr, $xn: ident, $bk: block) => {
+            for $yn in 0..$y {
+                for $xn in 0..$x {
+                    $bk
+                }
+            }
+        }
+    }
+}
 pub mod layer {
 
     use crate::utils::types::*;
@@ -70,9 +83,8 @@ pub mod utils {
         //     fn new()
         // }
         pub mod algebra {
-            use std::ops::{Rem, Add, Mul};
+            use std::ops::{Rem, Add, Mul, Sub, Div};
             use std::fmt::{Display, Debug, Formatter, Result};
-            extern crate num_traits;
             use num_traits::{Zero};
 
             // type DebugElement = Zero + Display + Copy;
@@ -129,6 +141,12 @@ pub mod utils {
                         panic!("this is matrix");
                     }
                 }
+                pub fn get_dim(&self) -> (i64, i64) {
+                    (self._nx, self._ny)
+                }
+                pub fn comp_dim_with(&self, shr: &Self) -> bool {
+                    self.get_dim() == shr.get_dim()
+                }
                 pub fn set(&mut self, y: i64, x: i64, val: T) {
                     if self.is_scalar() {
                         panic!("this is scalar")
@@ -142,7 +160,7 @@ pub mod utils {
                         panic!("This is a matrix not the scalar.");
                     }
                 }
-                pub fn elem_cal<F: Fn(T, T)->T>(&self, with: T, cal_fn: F) -> Matrix<T> {
+                pub fn elem_with_scalar<F: Fn(T, T)->T>(&self, with: T, cal_fn: F) -> Self {
                     // TODO: Refactoring this
                     let mut temp = Matrix::<T>::new(self._ny, self._nx);
                     for y in 0..self._ny as usize {
@@ -152,6 +170,24 @@ pub mod utils {
                         }
                     }
                     temp
+                }
+                pub fn elemwise_cal<F: Fn(T, T)->T>(&self, with: Self, cal_fn: F) -> Self {
+                    let mut temp = Matrix::<T>::new(self._ny, self._nx);
+                    forfor!(self._ny, y, self._nx, x, {
+                        temp.set(y, x, cal_fn(self.get(y, x), with.get(y, x)));
+                    });
+                    temp
+                }
+                pub fn cal_with_scalar<F: Fn(T, T)->T>(this: Self, andthis: Self, cal_fn: F) -> Self {
+                    if this.is_scalar() {
+                        andthis.elem_with_scalar(this.s_get(), cal_fn)
+                    } else if andthis.is_scalar() {
+                        this.elem_with_scalar(andthis.s_get(), cal_fn)
+                    } else if this.comp_dim_with(&andthis) {
+                        this.elemwise_cal(andthis, cal_fn)
+                    } else {
+                        panic!("can't calculate with this");
+                    }
                 }
                 // pub fn derivative(&mut self) -> Matrix<f64> {
                 // }
@@ -170,31 +206,21 @@ pub mod utils {
                     write!(f, "{}", strg)
                 }
             }
+            macro_rules! opt_impl {
+                ($funcn:ident, $func:ident, $c:expr) => {
+                    impl<T> $funcn<Matrix<T>> for Matrix<T> where T: Clone + Copy + Zero + Display + $funcn<Output = T> {
+                        type Output = Self;
+                        fn $func(self, rhs: Self) -> Self {
+                            Self::cal_with_scalar(self, rhs, $c)
+                        }
+                    }
+                }
+            }
+            opt_impl!(Add, add, |a, b| a + b);
+            opt_impl!(Mul, mul, |a, b| a + b);
+            opt_impl!(Sub, sub, |a, b| a - b);
+            opt_impl!(Div, div, |a, b| a / b);
 
-            impl<T> Add<Matrix<T>> for Matrix<T> where T: Clone + Copy + Zero + Display {
-                type Output = Self;
-                fn add(self, rhs: Self) -> Self {
-                    if rhs.is_scalar() {
-                        self.elem_cal(rhs.n[0][0].num(), |a, b| a + b)
-                    } else if self.is_scalar() {
-                        rhs.elem_cal(self.n[0][0].num(), |a, b| a + b)
-                    } else {
-                        panic!("can't add with this!");
-                    }
-                }
-            }
-            impl<T> Mul<Matrix<T>> for Matrix<T> where T: Clone + Copy + Zero + Display + Mul<Output = T> {
-                type Output = Self;
-                fn mul(self, rhs: Self) -> Self {
-                    if rhs.is_scalar() {
-                        self.elem_cal(rhs.n[0][0].num(), |a, b| a * b)
-                    } else if self.is_scalar() {
-                        rhs.elem_cal(self.n[0][0].num(), |a, b| a * b)
-                    } else {
-                        panic!("can't multiply with this!");
-                    }
-                }
-            }
         }
         // pub fn derivative(f: fn(f64)->f64) -> impl Fn(f64) -> f64 {
         //     // let df = derivative(|x| x.powi(2));
@@ -546,11 +572,11 @@ fn main()
     //     // };
     //     new_model.back_propagation();
     // }
+    let mut w1 = Matrix::<f64>::new(3, 4);
     let mut w = Matrix::<f64>::new(3, 4);
     let mut a = Matrix::<f64>::new_scalar(4.);
     let mut b = Matrix::<f64>::new_scalar(2.);
-    a.s_set(3.);
-    w.set(2, 3, 10.);
     w.set(1, 3, 1.);
-    println!("{}", a * w + b);
+    w.set(1, 3, 4.);
+    println!("{}", w * w1);
 }
