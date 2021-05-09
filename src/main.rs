@@ -70,37 +70,80 @@ pub mod utils {
         //     fn new()
         // }
         pub mod algebra {
+            use std::ops::{Rem, Add, Mul};
+            use std::fmt::{Display, Debug, Formatter, Result};
+            extern crate num_traits;
+            use num_traits::{Zero};
+
+            // type DebugElement = Zero + Display + Copy;
+
             // use crate::utils::maths::derivative;
-            #[derive(Debug, Clone)]
+            #[derive(Clone, Copy)]
             enum Element<T> {
                 Zero,
                 Num(T)
             }
+            impl<T> Element<T> {
+                fn num(self) -> T where T: Zero + Display + Copy {
+                    match self {
+                        Element::Num(v) => v,
+                        _ => Zero::zero(),
+                    }
+                }
+            }
+            impl<T> Debug for Element<T> where T: Zero + Display + Copy {
+                fn fmt(&self, f: &mut Formatter) -> Result {
+                    write!(f, "{}", self.num())
+                }
+            }
 
-            #[derive(Debug, Clone)]
             pub struct Matrix<T> {
                 n: Vec<Vec<Element<T>>>,
                 _nx: i64,
                 _ny: i64,
             }
 
-            impl<T> Matrix<T> where T: Clone {
-                fn new(ny: i64, nx:i64) -> Matrix<T> {
+            impl<T> Matrix<T> where T: Clone + Copy + Zero {
+                pub fn new(ny: i64, nx:i64) -> Matrix<T> {
                     Matrix { n: (0..ny).map(|_| vec![Element::Zero; nx as usize]).collect(), _nx: nx, _ny: ny }
+                }
+                pub fn new_scalar(val: T) -> Matrix<T> {
+                    Matrix { n: vec![vec![Element::Num(val)]], _nx: 1, _ny: 1 }
+                }
+                pub fn is_scalar(&self) -> bool {
+                    self._nx == 1 && self._ny == 1
                 }
                 pub fn from_fn<F: Fn()->T>(init_fn: F, ny: i64, nx:i64) -> Matrix<T> {
                     Matrix { n: (0..ny).map(|_| (0..nx).map(|_| Element::Num(init_fn())).collect()).collect(), _nx: nx, _ny: ny }
                 }
-                pub fn get(&self, y: i64, x: i64) -> &T {
+                pub fn get(&self, y: i64, x: i64) -> T {
                     match &self.n[y as usize][x as usize] {
-                        Element::Num(n) => n,
-                        Element::Zero => panic!("out of index!"),
+                        Element::Num(n) => *n,
+                        Element::Zero => Zero::zero(),
+                    }
+                }
+                pub fn s_get(&self) -> T {
+                    if self.is_scalar() {
+                        self.get(0, 0)
+                    } else {
+                        panic!("this is matrix");
                     }
                 }
                 pub fn set(&mut self, y: i64, x: i64, val: T) {
+                    if self.is_scalar() {
+                        panic!("this is scalar")
+                    }
                     self.n[y as usize][x as usize] = Element::Num(val);
                 }
-                pub fn elem_cal<F: Fn(&T, &T)->T>(&mut self, with: &T, cal_fn: F) -> Matrix<T> {
+                pub fn s_set(&mut self, val: T) {
+                    if self.is_scalar() {
+                        self.n[0][0] = Element::Num(val);
+                    } else {
+                        panic!("This is a matrix not the scalar.");
+                    }
+                }
+                pub fn elem_cal<F: Fn(T, T)->T>(&self, with: T, cal_fn: F) -> Matrix<T> {
+                    // TODO: Refactoring this
                     let mut temp = Matrix::<T>::new(self._ny, self._nx);
                     for y in 0..self._ny as usize {
                         for x in 0..self._nx as usize {
@@ -111,8 +154,46 @@ pub mod utils {
                     temp
                 }
                 // pub fn derivative(&mut self) -> Matrix<f64> {
-                    
                 // }
+            }
+
+            impl<T> Display for Matrix<T> where T: Display + Zero + Copy {
+                fn fmt(&self, f: &mut Formatter) -> Result {
+                    let mut strg = "".to_owned();
+                    for y in 0..self._ny as usize {
+                        for x in 0..self._nx as usize {
+                            strg.push_str(&format!("{:>5}", format!("{:?}", self.n[y][x])));
+                        }
+                        strg.push_str("\n");
+                    }
+                    // write!(f, "{:?}", self.n[y][x]);
+                    write!(f, "{}", strg)
+                }
+            }
+
+            impl<T> Add<Matrix<T>> for Matrix<T> where T: Clone + Copy + Zero + Display {
+                type Output = Self;
+                fn add(self, rhs: Self) -> Self {
+                    if rhs.is_scalar() {
+                        self.elem_cal(rhs.n[0][0].num(), |a, b| a + b)
+                    } else if self.is_scalar() {
+                        rhs.elem_cal(self.n[0][0].num(), |a, b| a + b)
+                    } else {
+                        panic!("can't add with this!");
+                    }
+                }
+            }
+            impl<T> Mul<Matrix<T>> for Matrix<T> where T: Clone + Copy + Zero + Display + Mul<Output = T> {
+                type Output = Self;
+                fn mul(self, rhs: Self) -> Self {
+                    if rhs.is_scalar() {
+                        self.elem_cal(rhs.n[0][0].num(), |a, b| a * b)
+                    } else if self.is_scalar() {
+                        rhs.elem_cal(self.n[0][0].num(), |a, b| a * b)
+                    } else {
+                        panic!("can't multiply with this!");
+                    }
+                }
             }
         }
         // pub fn derivative(f: fn(f64)->f64) -> impl Fn(f64) -> f64 {
@@ -250,6 +331,7 @@ use utils::activations::*;
 use utils::initializer::*;
 use utils::cost::*;
 use utils::maths::*;
+use utils::maths::algebra::*;
 use layer::LAYER::*;
 use layer::*;
 
@@ -451,17 +533,24 @@ fn main()
     new_model.add_layer(4, 3, HIDDEN, Some("input"));
     new_model.add_layer(3, 8, HIDDEN, Some("input"));
     new_model.add_layer(8, 0, OUT(output), Some("output"));
-    for i in (0..500) {
-        // if i % 10 == 0 && 0 != i {
-            println!("{:0} epoch, loss: {}", i, new_model.cost);
-        // }
-        let bp = new_model.cost;
-        new_model.forward_propagation();
-        // if bp < new_model.cost && bp != 0. {
-        //     println!("over");
-        //     break
-        // };
-        new_model.back_propagation();
-    }
-    // new_model.debug();
+
+    // for i in (0..500) {
+    //     // if i % 10 == 0 && 0 != i {
+    //         println!("{:0} epoch, loss: {}", i, new_model.cost);
+    //     // }
+    //     let bp = new_model.cost;
+    //     new_model.forward_propagation();
+    //     // if bp < new_model.cost && bp != 0. {
+    //     //     println!("over");
+    //     //     break
+    //     // };
+    //     new_model.back_propagation();
+    // }
+    let mut w = Matrix::<f64>::new(3, 4);
+    let mut a = Matrix::<f64>::new_scalar(4.);
+    let mut b = Matrix::<f64>::new_scalar(2.);
+    a.s_set(3.);
+    w.set(2, 3, 10.);
+    w.set(1, 3, 1.);
+    println!("{}", a * w + b);
 }
