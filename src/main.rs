@@ -1,5 +1,66 @@
+pub mod layer {
+
+    use crate::utils::types::*;
+    use crate::utils::maths::*;
+
+    #[derive(Debug)]
+    pub enum LAYER {
+        IN(Vec<Weight>),
+        OUT(Vec<Weight>),
+        HIDDEN,
+    }
+    impl LAYER {
+        pub fn unwrap(self) -> Option<Vec<Weight>> {
+            match self {
+                LAYER::IN(vw) | LAYER::OUT(vw) => Some(vw),
+                _ => None
+            }
+        }
+        pub fn unwrap_with_index(&self, i: usize) -> NumOrZeroF64 {
+            match &self {
+                LAYER::IN(vw) | LAYER::OUT(vw) => {
+                    NumOrZeroF64::Num(vw[i])
+                },
+                _ => NumOrZeroF64::Zero
+            }
+        }
+        pub fn get_dim(&self, fan_in: Dimension, fan_out: Dimension) -> Dimension {
+            match &self {
+                LAYER::IN(_) | LAYER::HIDDEN => fan_in,
+                LAYER::OUT(_) => fan_out
+            }
+        }
+        pub fn get_len(&self) -> usize {
+            match &self {
+                LAYER::IN(val) | LAYER::OUT(val) => val.len(),
+                _ => 0
+            }
+        }
+        pub fn check_size(&self, dim: Dimension) -> bool {
+            match &self {
+                LAYER::IN(val) | LAYER::OUT(val) => (val.len() == dim as usize),
+                _ => true
+            }
+        }
+    }
+}
+
 pub mod utils {
     pub mod maths {
+        #[derive(Debug, Clone, Copy)]
+        pub enum NumOrZeroF64 {
+            Num(f64),
+            Zero,
+        }
+        impl NumOrZeroF64 {
+            pub fn reveal(self) -> f64 {
+                match self {
+                    NumOrZeroF64::Num(x) => x,
+                    _ => 0.,
+                }
+            }
+        }
+
         // use std::collections::HashMap;
         // pub struct Expression<EXP: Fn(Vec<f64>) -> f64> {
         //     exp: EXP,
@@ -99,21 +160,18 @@ pub mod utils {
         use crate::utils::types::{Dimension, Weight};
         use crate::utils::maths::rand::*;
         // Sigmoid / Tanh
-        pub fn xavier_initializer(fan_in: Dimension, fan_out: Dimension) -> Weight
-        {
+        pub fn xavier_initializer(fan_in: Dimension, fan_out: Dimension) -> Weight {
             // rand()
                 1.
         }
 
         // ReLU
-        pub fn he_initializer(fan_in: Dimension, fan_out: Dimension) -> Weight
-        {
+        pub fn he_initializer(fan_in: Dimension, fan_out: Dimension) -> Weight {
             rand()
         }
     }
     pub mod activations {
-        pub fn sigmoid(x: f64) -> f64
-        {
+        pub fn sigmoid(x: f64) -> f64 {
             1. / (1. + (-x).exp())
         }
         pub fn d_sigmoid_v(vec: &Vec<f64>) -> f64 {
@@ -122,6 +180,48 @@ pub mod utils {
         pub fn d_sigmoid(x: f64) -> f64 {
             x * (1. - x)
         }
+        pub fn ReLU(x: f64) -> f64 {
+            if 0. < x {
+                x
+            } else {
+                0.
+            }
+        }
+        pub fn d_ReLU(x: f64) -> f64 {
+            if 0. < x {
+                1.
+            } else {
+                0.
+            }
+        }
+        pub fn Leaky_ReLU(x: f64) -> f64 {
+            if 0. < x {
+                x
+            } else {
+                x * 0.001
+            }
+        }
+        pub fn d_Leaky_ReLU(x: f64) -> f64 {
+            if 0. < x {
+                1.
+            } else {
+                0.001
+            }
+        }
+        // pub fn ELU(x: f64) -> f64 {
+        //     if 0. < x {
+        //         x
+        //     } else {
+        //         x.exp() - 1.
+        //     }
+        // }
+        // pub fn d_ELU(x: f64) -> f64 {
+        //     if 0. < x {
+        //         1.
+        //     } else {
+        //         x.exp()
+        //     }
+        // }
     }
 
     pub mod cost {
@@ -150,6 +250,8 @@ use utils::activations::*;
 use utils::initializer::*;
 use utils::cost::*;
 use utils::maths::*;
+use layer::LAYER::*;
+use layer::*;
 
 #[derive(Clone, Debug)]
 struct Neuron {
@@ -160,20 +262,6 @@ struct Neuron {
     bias: Bias,             // bias, TODO: toggle this
     loss: Error,            // local loss
     local_loss: Vec<Weight>,
-}
-
-#[derive(Debug, Clone, Copy)]
-enum NumOrZeroF64 {
-    Num(f64),
-    Zero,
-}
-impl NumOrZeroF64 {
-    fn reveal(self) -> f64 {
-        match self {
-            NumOrZeroF64::Num(x) => x,
-            _ => 0.,
-        }
-    }
 }
 
 impl Neuron {
@@ -195,13 +283,13 @@ impl Neuron {
     }
 
     fn get_loss(&mut self) -> Error {
-        self.loss = MSE(self.input.reveal(), self.z);
+        self.loss = MSE(self.input.reveal(), self.o);
         self.loss
     }
 
-    fn update_z(&mut self, weight_sum: Weight) {
+    fn update_z(&mut self, weight_sum: Weight, act: fn(f64)->f64) {
         self.z = self.bias + weight_sum;
-        self.o = sigmoid(self.z);
+        self.o = act(self.z);
     }
 }
 
@@ -212,13 +300,12 @@ struct Model
     layers: Vec<Layer>,
     layer_size: usize,
     lr: f64,                // learning rate
-    cost: Error,
+    cost: Error,            // total loss
 }
 
 impl Model {
-    // TODO: optional learning rate
-    fn new(name: &'static str) -> Model {
-        Model { name: name, layers: Vec::new(), layer_size: 0, lr: 0.1, cost: 0. }
+    fn new(name: &'static str, lr: f64) -> Model {
+        Model { name: name, layers: Vec::new(), layer_size: 0, lr: lr, cost: 0. }
     }
     fn push_layer(&mut self, layer: Layer) {
         self.layers.push(layer);
@@ -251,7 +338,6 @@ impl Model {
                 for neuron in &mut self.layers[i].neurons {
                     self.cost = self.cost + neuron.get_loss();
                 }
-                println!("cost: {}", self.cost);
             } else {
                 if self.layers[i].fan_out != self.layers[i+1].fan_in {
                     panic!("layer dimension mismatch!");
@@ -263,7 +349,7 @@ impl Model {
                     for j in 0..self.layers[i].neurons.len() as usize {
                         weight_sum = self.layers[i].neurons[j].get_wx(k) + weight_sum;
                     }
-                    self.layers[i+1].neurons[k].update_z(weight_sum);
+                    self.layers[i+1].neurons[k].update_z(weight_sum, sigmoid);
                 }
             }
         }
@@ -271,7 +357,7 @@ impl Model {
     fn back_propagation(&mut self) {
         for l in (0..(self.layer_size-1)).rev() {
             if let LAYER::OUT(_) = self.layers[l+1]._type {
-                for n in 0..self.layers[l+1].neurons.len() { // 4 loop
+                for n in 0..self.layers[l+1].neurons.len() {
                     // calculate (dE_total / dh)
                     // let mut dv_E_total: Vec<f64> = vec![self.layers[l+1].neurons[n].input.reveal() - self.layers[l+1].neurons[n].o];
                     // let E_total = numerical_derivative(d_MSE, &mut dv_E_total)[0];
@@ -283,7 +369,7 @@ impl Model {
                     let o = d_sigmoid(self.layers[l+1].neurons[n].o);
                     let E_total__o = E_total * o;
 
-                    for w in 0..self.layers[l].neurons.len() { // 3 loop
+                    for w in 0..self.layers[l].neurons.len() {
                         // calculate (dz / dW)
                         // let mut dv_z: Vec<f64> = vec![];
                         // (dE / dh)
@@ -309,11 +395,6 @@ impl Model {
                 }
             }
         }
-        // for i in (self.layer_size)..1 {
-        //     for k in 0..self.layers[i].fan_in as usize {
-        //         self.layers[i-1]
-        //     }
-        // }
     }
 
 }
@@ -348,7 +429,7 @@ impl LayerBlock for Layer {
     type _Layer = Layer;
     fn new(fan_in: Dimension, fan_out: Dimension, layer: LAYER, name: Option<&'static str>) -> Layer {
         if !layer.check_size(fan_in) {
-            panic!("\n| vector and fan_in length mismatch!\n| at layer '{}', got {} size vector, expected {}\n", name.unwrap(), layer.get_len(), fan_in);
+            panic!("\n| vector and fan_in length mismatch!\n| at layer '{}', got {} size vector, expect {}\n", name.unwrap(), layer.get_len(), fan_in);
         }
         Layer {
             name: name.unwrap(),
@@ -360,72 +441,27 @@ impl LayerBlock for Layer {
     }
 }
 
-#[derive(Debug)]
-enum LAYER {
-    IN(Vec<Weight>),
-    OUT(Vec<Weight>),
-    HIDDEN,
-}
-impl LAYER {
-    fn unwrap(self) -> Option<Vec<Weight>> {
-        match self {
-            LAYER::IN(vw) | LAYER::OUT(vw) => Some(vw),
-            _ => None
-        }
-    }
-    fn unwrap_with_index(&self, i: usize) -> NumOrZeroF64 {
-        match &self {
-            LAYER::IN(vw) | LAYER::OUT(vw) => {
-                NumOrZeroF64::Num(vw[i])
-            },
-            _ => NumOrZeroF64::Zero
-        }
-    }
-    fn get_dim(&self, fan_in: Dimension, fan_out: Dimension) -> Dimension {
-        match &self {
-            LAYER::IN(_) | LAYER::HIDDEN => fan_in,
-            LAYER::OUT(_) => fan_out
-        }
-    }
-    fn get_len(&self) -> usize {
-        match &self {
-            LAYER::IN(val) | LAYER::OUT(val) => val.len(),
-            _ => 0
-        }
-    }
-    fn check_size(&self, dim: Dimension) -> bool {
-        match &self {
-            LAYER::IN(val) | LAYER::OUT(val) => (val.len() == dim as usize),
-            _ => true
-        }
-    }
-}
-
 fn main()
 {
-    let input = vec![0.1, 0.2];
-    let output = vec![0.4, 0.3, 0.3];
-    let mut new_model = Model::new("test");
-    // 0, 4
-    // 4, 3
-    // 3, 0
-    new_model.add_layer(2, 5, LAYER::IN(input), Some("input"));
-    new_model.add_layer(5, 3, LAYER::HIDDEN, Some("third"));
-    new_model.add_layer(3, 4, LAYER::HIDDEN, Some("third"));
-    new_model.add_layer(4, 3, LAYER::HIDDEN, Some("third"));
-    new_model.add_layer(3, 0, LAYER::OUT(output), Some("output"));
-    for i in (0..400) {
+    let input = vec![0.1, 0.2, 0.5, 0.8, 0.7, 0.7, 0.2, 0.4];
+    let output = vec![0.1, 0.2, 0.5, 0.8, 0.7, 0.7, 0.2, 0.4];
+    let mut new_model = Model::new("test", 0.1);
+    new_model.add_layer(8, 9, IN(input), Some("input"));
+    new_model.add_layer(9, 4, HIDDEN, Some("input"));
+    new_model.add_layer(4, 3, HIDDEN, Some("input"));
+    new_model.add_layer(3, 8, HIDDEN, Some("input"));
+    new_model.add_layer(8, 0, OUT(output), Some("output"));
+    for i in (0..500) {
+        // if i % 10 == 0 && 0 != i {
+            println!("{:0} epoch, loss: {}", i, new_model.cost);
+        // }
+        let bp = new_model.cost;
         new_model.forward_propagation();
+        // if bp < new_model.cost && bp != 0. {
+        //     println!("over");
+        //     break
+        // };
         new_model.back_propagation();
     }
-    new_model.debug();
-    // new_model.back_propagation();
-    // let mut newModel = Model::<2>::new("new");
-    // const A: [usize;2] = [1, 2];
-
-    // newModel.add_layer::<{A[0]}, 3>(input, Some("new"));
-    // layer.forward(&mut layer1);
-    // println!("Hello, world!{}", L[0]);
-    // let mut vec: Vec<f64> = vec![, 4.];
-    // println!("{:?}", numerical_derivative(pf, &mut vec));
+    // new_model.debug();
 }
