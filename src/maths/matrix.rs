@@ -58,6 +58,16 @@ impl<T> Matrix<T> where T: Clone + Zero {
     }
 
     #[inline]
+    pub fn y(&self) -> i64 {
+        self._ny
+    }
+
+    #[inline]
+    pub fn x(&self) -> i64 {
+        self._nx
+    }
+
+    #[inline]
     pub fn from_fn<F: Fn()->T>(init_fn: F, ny: i64, nx:i64) -> Matrix<T> {
         Matrix { n: (0..ny).map(|_| (0..nx).map(|_| Element::Num(init_fn())).collect()).collect(), _nx: nx, _ny: ny }
     }
@@ -158,10 +168,11 @@ impl<T> Display for Matrix<T> where T: Display + Zero + Clone {
     fn fmt(&self, f: &mut Formatter) -> Result {
         let mut strg = "".to_owned();
         for y in 0..self._ny as usize {
+            strg.push_str("[");
             for x in 0..self._nx as usize {
-                strg.push_str(&format!("{:>5}", format!("{}", &self.get(y as i64, x as i64))));
+                strg.push_str(&format!(" {} ", &self.get(y as i64, x as i64)));
             }
-            strg.push_str("\n");
+            strg.push_str("]\n");
         }
         // write!(f, "{:?}", self.n[y][x]);
         write!(f, "{}", strg)

@@ -53,8 +53,8 @@ impl Activation for Leaky_ReLU {
 }
 
 #[allow(non_camel_case_types)]
-pub struct END;
-impl Activation for END {
+pub struct A_END;
+impl Activation for A_END {
     fn feed_forward(&self, _: f64) -> f64 {
         panic!("This won't be called normally. something is wrong!")
     }

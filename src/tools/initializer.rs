@@ -6,7 +6,14 @@ pub fn xavier_initializer(fan_in: Dimension, fan_out: Dimension) -> Weight {
         1.
 }
 
-// ReLU
-pub fn he_initializer(fan_in: Dimension, fan_out: Dimension) -> Weight {
-    rand()
+pub trait WeightInitializer {
+    fn initializer(&self, fan_in: Dimension, fan_out: Dimension) -> Weight;
+}
+
+pub struct he_initializer;
+impl WeightInitializer for he_initializer {
+    // ReLU
+    fn initializer(&self, fan_in: Dimension, fan_out: Dimension) -> Weight {
+        rand()
+    }
 }

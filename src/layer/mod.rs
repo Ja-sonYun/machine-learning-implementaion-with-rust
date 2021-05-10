@@ -1,5 +1,10 @@
+pub mod neuron;
+
 use crate::utils::types::*;
 use crate::maths::*;
+use crate::layer::neuron::Neuron;
+use crate::tools::activations::Activation;
+use crate::tools::initializer::WeightInitializer;
 
 #[derive(Debug)]
 pub enum LAYER {
@@ -40,4 +45,45 @@ impl LAYER {
             _ => true
         }
     }
+}
+pub struct LayerObj<'lng>
+{
+    pub name: &'static str,
+    pub neurons: Vec<Neuron>,
+    pub fan_in: Dimension,
+    pub fan_out: Dimension,
+    pub activation: Box<dyn Activation + 'lng>,
+    pub _type: LAYER
+}
+
+fn init_neurons<'lng>(fan_in: Dimension, fan_out: Dimension, layer: &LAYER, initializer: &Box<dyn WeightInitializer + 'lng>) -> Vec<Neuron> {
+    let mut neurons: Vec<Neuron>;
+    // if this layer is input or hidden,
+    neurons = Vec::with_capacity(fan_in as usize);
+    for i in 0..fan_in as usize {
+        neurons.push(Neuron::new(layer.unwrap_with_index(i), 0., fan_in, fan_out, initializer));
+    }
+    // if this layer is output, which is doens't have nuerons
+    neurons
+}
+
+pub fn new_layer_obj<'lng>(fan_in: Dimension, fan_out: Dimension, layer: LAYER, activation: impl Activation + 'lng, initializer: &Box<dyn WeightInitializer + 'lng>, name: Option<&'static str>) -> LayerObj<'lng> {
+    if !layer.check_size(fan_in) {
+        panic!("\n| vector and fan_in length mismatch!\n| at layer '{}', got {} size vector, expect {}\n", name.unwrap(), layer.get_len(), fan_in);
+    }
+    LayerObj {
+        name: name.unwrap(),
+        neurons: init_neurons(fan_in, fan_out, &layer, initializer),
+        fan_in: fan_in,
+        fan_out: fan_out,
+        activation: Box::new(activation),
+        _type: layer
+    }
+}
+
+pub trait Layer {
+}
+
+pub struct DummyLayer;
+impl Layer for DummyLayer {
 }

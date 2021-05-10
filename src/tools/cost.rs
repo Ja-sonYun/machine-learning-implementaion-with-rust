@@ -1,11 +1,16 @@
-use crate::utils::types::Error;
+use crate::utils::types::{Error, Weight};
 
-pub fn MSE(target: f64, output: f64) -> Error {
-    (target - output).powi(2) / 2.
+pub trait CostFunction {
+    fn feed_forward(&self, target: Weight, output: Weight) -> Error;
+    fn back_propagation(&self, target: Weight, output: Weight) -> Error;
 }
-pub fn d_MSE_v(vec: &Vec<f64>) -> Error {
-    (vec[0]).powi(2) / 2.
-}
-pub fn d_MSE(target: f64, output: f64) -> Error {
-    -(target - output)
+
+pub struct MSE;
+impl CostFunction for MSE {
+    fn feed_forward(&self, target: Weight, output: Weight) -> Error {
+        (target - output).powi(2) / 2.
+    }
+    fn back_propagation(&self, target: Weight, output: Weight) -> Error {
+        -(target - output)
+    }
 }
