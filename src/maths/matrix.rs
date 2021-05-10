@@ -6,7 +6,7 @@
 // impl<EXP: Fn(Vec<f64>) -> f64> Expression<EXP> {
 //     fn new()
 // }
-use std::ops::{Rem, Add, Mul, Sub, Div};
+use std::ops::{Add, Mul, Sub, Div};
 use std::fmt::{Display, Debug, Formatter, Result};
 use num_traits::{Zero};
 use crate::forfor;
@@ -33,13 +33,14 @@ impl<T> Debug for Element<T> where T: Zero + Display + Copy {
     }
 }
 
+#[derive(Clone)]
 pub struct Matrix<T> {
     n: Vec<Vec<Element<T>>>,
     _nx: i64,
     _ny: i64,
 }
 
-impl<T> Matrix<T> where T: Clone + Copy + Zero {
+impl<T> Matrix<T> where T: Clone + Zero {
     pub fn new(ny: i64, nx:i64) -> Matrix<T> {
         Matrix { n: (0..ny).map(|_| vec![Element::Zero; nx as usize]).collect(), _nx: nx, _ny: ny }
     }
@@ -54,9 +55,12 @@ impl<T> Matrix<T> where T: Clone + Copy + Zero {
     }
     pub fn get(&self, y: i64, x: i64) -> T {
         match &self.n[y as usize][x as usize] {
-            Element::Num(n) => *n,
+            Element::Num(n) => n.clone(),
             Element::Zero => Zero::zero(),
         }
+    }
+    fn zero() -> Matrix<T> {
+        Matrix::<T>::new(1, 1)
     }
     pub fn s_get(&self) -> T {
         if self.is_scalar() {
@@ -88,7 +92,7 @@ impl<T> Matrix<T> where T: Clone + Copy + Zero {
         // TODO: Refactoring this, use map?
         let mut temp = Matrix::<T>::new(self._ny, self._nx);
         forfor!(self._ny, y, self._nx, x, {
-            temp.set(y, x, cal_fn(self.get(y, x), with));
+            temp.set(y, x, cal_fn(self.get(y, x), with.clone()));
         });
         temp
     }
@@ -114,12 +118,20 @@ impl<T> Matrix<T> where T: Clone + Copy + Zero {
     // }
 }
 
-impl<T> Display for Matrix<T> where T: Display + Zero + Copy {
+impl<T> Zero for Matrix<T> where T: Zero + Clone + Display + Copy {
+    fn zero() -> Matrix<T> { Matrix::<T>::zero() }
+    fn is_zero(&self) -> bool {
+        // TODO:impl this
+        true
+    }
+}
+
+impl<T> Display for Matrix<T> where T: Display + Zero + Clone {
     fn fmt(&self, f: &mut Formatter) -> Result {
         let mut strg = "".to_owned();
         for y in 0..self._ny as usize {
             for x in 0..self._nx as usize {
-                strg.push_str(&format!("{:>5}", format!("{:?}", self.n[y][x])));
+                strg.push_str(&format!("{:>5}", format!("{}", &self.get(y as i64, x as i64))));
             }
             strg.push_str("\n");
         }

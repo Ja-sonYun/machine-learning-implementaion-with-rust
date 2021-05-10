@@ -264,9 +264,9 @@ fn main()
     let mut w = Matrix::<f64>::new(3, 4);
     let mut a = Matrix::<f64>::new_scalar(4.);
     let mut b = Matrix::<f64>::new_scalar(2.);
+    let mat = || Matrix::<f64>::new(3, 4);
+    let matmat = Matrix::<Matrix<f64>>::from_fn(mat, 3, 3);
     w1.set(1, 3, 1.);
     w.set(1, 3, 4.);
-    println!("{}", w);
-    println!("{}", w1);
-    println!("{}", w * w1);
+    println!("{}", matmat);
 }
