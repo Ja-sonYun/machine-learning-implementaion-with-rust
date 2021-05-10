@@ -43,7 +43,7 @@ impl<'lng> Model<'lng> {
             self.forward_propagation();
             self.back_propagation();
             if log && e % log_interval == 0 {
-                println!("{:0} epoch, loss: {}", e, self.cost);
+                println!("{:0} step, loss: {}", e, self.cost);
             }
         }
     }
