@@ -85,7 +85,7 @@ impl<T> Matrix<T> where T: Clone + Copy + Zero {
         }
     }
     pub fn elem_with_scalar<F: Fn(T, T)->T>(&self, with: T, cal_fn: F) -> Self {
-        // TODO: Refactoring this
+        // TODO: Refactoring this, use map?
         let mut temp = Matrix::<T>::new(self._ny, self._nx);
         forfor!(self._ny, y, self._nx, x, {
             temp.set(y, x, cal_fn(self.get(y, x), with));
@@ -127,6 +127,8 @@ impl<T> Display for Matrix<T> where T: Display + Zero + Copy {
         write!(f, "{}", strg)
     }
 }
+
+// implement matrix calculate
 macro_rules! opt_impl {
     ($funcn:ident, $func:ident, $c:expr) => {
         impl<T> $funcn<Matrix<T>> for Matrix<T> where T: Clone + Copy + Zero + Display + $funcn<Output = T> {

@@ -2,54 +2,6 @@ extern crate ml;
 use ml::*;
 use tools::*;
 
-pub mod layer {
-    use ml::*;
-
-    use utils::types::*;
-    use maths::*;
-
-    #[derive(Debug)]
-    pub enum LAYER {
-        IN(Vec<Weight>),
-        OUT(Vec<Weight>),
-        HIDDEN,
-    }
-    impl LAYER {
-        pub fn unwrap(self) -> Option<Vec<Weight>> {
-            match self {
-                LAYER::IN(vw) | LAYER::OUT(vw) => Some(vw),
-                _ => None
-            }
-        }
-        pub fn unwrap_with_index(&self, i: usize) -> NumOrZeroF64 {
-            match &self {
-                LAYER::IN(vw) | LAYER::OUT(vw) => {
-                    NumOrZeroF64::Num(vw[i])
-                },
-                _ => NumOrZeroF64::Zero
-            }
-        }
-        pub fn get_dim(&self, fan_in: Dimension, fan_out: Dimension) -> Dimension {
-            match &self {
-                LAYER::IN(_) | LAYER::HIDDEN => fan_in,
-                LAYER::OUT(_) => fan_out
-            }
-        }
-        pub fn get_len(&self) -> usize {
-            match &self {
-                LAYER::IN(val) | LAYER::OUT(val) => val.len(),
-                _ => 0
-            }
-        }
-        pub fn check_size(&self, dim: Dimension) -> bool {
-            match &self {
-                LAYER::IN(val) | LAYER::OUT(val) => (val.len() == dim as usize),
-                _ => true
-            }
-        }
-    }
-}
-
 use utils::types::*;
 use activations::*;
 use initializer::*;
@@ -102,23 +54,38 @@ impl Neuron {
 struct Model<'lng>
 {
     name: &'static str,
-    layers: Vec<Layer<'lng>>,
+    layers: Vec<LayerObj<'lng>>,
     layer_size: usize,
     lr: f64,                // learning rate
     cost: Error,            // total loss
 }
 
 impl<'lng> Model<'lng> {
-    fn new(name: &'static str, lr: f64) -> Self {
-        Model { name: name, layers: Vec::new(), layer_size: 0, lr: lr, cost: 0. }
+    fn new(name: &'static str) -> Self {
+        Model { name: name, layers: Vec::new(), layer_size: 0, lr: 0., cost: 0. }
     }
-    fn push_layer(&mut self, layer: Layer<'lng>) {
+
+    fn push_layer(&mut self, layer: LayerObj<'lng>) {
         self.layers.push(layer);
         self.layer_size = self.layer_size + 1;
     }
+
     fn add_layer(&mut self, fan_in: Dimension, fan_out: Dimension, layer: LAYER, activation: impl Activation + 'lng, name: Option<&'static str>) {
-        self.push_layer(Layer::new(fan_in, fan_out, layer, activation, name));
+        self.push_layer(LayerObj::new(fan_in, fan_out, layer, activation, name));
     }
+
+    // param: epoch, learning rate, log, log interval
+    fn train(&mut self, epoch: usize, lr: f64, log: bool, log_interval: usize) {
+        self.lr = lr;
+        for e in 0..epoch {
+            self.forward_propagation();
+            self.back_propagation();
+            if log && e % log_interval == 0 {
+                println!("{:0} epoch, loss: {}", e, self.cost);
+            }
+        }
+    }
+
     fn debug(&self) {
         println!("=================================");
         println!("| model {} -> {} layers |", self.name, self.layer_size);
@@ -134,69 +101,103 @@ impl<'lng> Model<'lng> {
         println!("=================================");
         println!(" * Total cost: {}", self.cost);
     }
+
     fn forward_propagation(&mut self) {
         // loop layers
         for i in 0..(self.layer_size) {
-            // loop for get total loss and update local losses if its output layer
+
+            //-------If the layer is last, calculate loss without feed forward-----
             if let LAYER::OUT(_) = self.layers[i]._type {
+
+                //--clear cost--
                 self.cost = 0.;
+                //--------------
+
+                //--------Sum all local loss----------------------
                 for neuron in &mut self.layers[i].neurons {
                     self.cost = self.cost + neuron.get_loss();
                 }
+                //------------------------------------------------
+
+            //---------------------------------------------------------------------
+
+            //--------Do feed forward----------------------------------------------
             } else {
+
+                //--------Validate current fan_in, and next fan_out----------------
                 if self.layers[i].fan_out != self.layers[i+1].fan_in {
                     panic!("layer dimension mismatch!");
                 }
-                // loop each neurons
+                //-----------------------------------------------------------------
+
+                //-------feed forward, calculate each neruons from next layer------
                 for k in 0..self.layers[i+1].neurons.len() as usize {
+
+                    //------Get current layer's sum of each neuron's weights * input-//
                     let mut weight_sum: Weight = 0.;
-                    // loop for get sum of neuron's weights
                     for j in 0..self.layers[i].neurons.len() as usize {
+                        // get_wx(k) will get weight * input, on current layer, that the neuron at
+                        //  index i that heading to next neuron which is indexed at k
                         weight_sum = self.layers[i].neurons[j].get_wx(k) + weight_sum;
                     }
+                    //-------------------------------------------------------------
+
+                    //-------update output, activation(weight_sum + bias)----------
+                    // get bias of each neurons from next layer, and sum
                     let z = self.layers[i+1].neurons[k].bias + weight_sum;
+                    // use current layer's activation function
                     let o = self.layers[i].activation.feed_forward(z);
+                    // update next layers output which is same as this neuron's output
                     self.layers[i+1].neurons[k].update_o(z, o);
+                    //-------------------------------------------------------------
                 }
             }
+            //---------------------------------------------------------------------
         }
     }
+
     fn back_propagation(&mut self) {
         for l in (0..(self.layer_size-1)).rev() {
+            //--------Back propagation---------------------------------------------
+            //--------When next layer is output------------------------------------
             if let LAYER::OUT(_) = self.layers[l+1]._type {
+
+                //--------Looping length of next neurons---------------------------
                 for n in 0..self.layers[l+1].neurons.len() {
+
+
                     // calculate (dE_total / dh)
-                    // let mut dv_E_total: Vec<f64> = vec![self.layers[l+1].neurons[n].input.reveal() - self.layers[l+1].neurons[n].o];
-                    // let E_total = numerical_derivative(d_MSE, &mut dv_E_total)[0];
                     let E_total = d_MSE(self.layers[l+1].neurons[n].input.reveal(), self.layers[l+1].neurons[n].o);
 
                     // calculate (do / dz)
-                    // let mut dv_o: Vec<f64> = vec![self.layers[l+1].neurons[n].o];
-                    // let o = numerical_derivative(d_sigmoid, &mut dv_o)[0];
                     let o = self.layers[l].activation.back_propagation(self.layers[l+1].neurons[n].o);
+
                     let E_total__o = E_total * o;
 
+                    // update neurons weights of current layer using next layer's Errors
                     for w in 0..self.layers[l].neurons.len() {
                         // calculate (dz / dW)
-                        // let mut dv_z: Vec<f64> = vec![];
-                        // (dE / dh)
                         self.layers[l].neurons[w].local_loss[n] = E_total__o * self.layers[l].neurons[w].o;
 
                         // update weight
                         self.layers[l].neurons[w].weights[n] = self.layers[l].neurons[w].weights[n] - (self.lr * self.layers[l].neurons[w].local_loss[n]);
                     }
+
                 }
             } else {
                 for n in 0..self.layers[l].neurons.len() {
                     for w in 0..self.layers[l+1].neurons.len() {
-                        // self.layers[l].neruons[n].weights[w];
-                        let dE_total_W:f64 = self.layers[l+1].neurons[w].local_loss.iter().sum();
 
-                        // let mut dh_o: Vec<f64> = vec![self.layers[l+1].neurons[w].o];
-                        // let h = numerical_derivative(d_sigmoid, &mut dh_o)[0];
+                        // sum sum of errors from next layer
+                        let E_total:f64 = self.layers[l+1].neurons[w].local_loss.iter().sum();
+
+                        // do back propagation
                         let h = self.layers[l].activation.back_propagation(self.layers[l+1].neurons[w].o);
-                        self.layers[l].neurons[n].local_loss[w] = dE_total_W * self.layers[l].neurons[n].o * h;
 
+                        // get local error, dE_total / dWn
+                        self.layers[l].neurons[n].local_loss[w] = E_total * self.layers[l].neurons[n].o * h;
+
+                        // and update weights, ( Wn - (lr * E_Wn) )
                         self.layers[l].neurons[n].weights[w] = self.layers[l].neurons[n].weights[w] - (self.lr * self.layers[l].neurons[n].local_loss[w]);
                     }
                 }
@@ -206,12 +207,13 @@ impl<'lng> Model<'lng> {
 
 }
 
-// trait LayerList {
-// }
-// impl <ACT: Activation> LayerList for Layer<ACT> {
+// trait LayerObj_c {
+//     fn feed_forward();
+//     fn back_propagation();
 // }
 
-struct Layer<'lng>
+
+struct LayerObj<'lng>
 {
     name: &'static str,
     neurons: Vec<Neuron>,
@@ -221,14 +223,14 @@ struct Layer<'lng>
     _type: LAYER
 }
 
-impl<'lng> Layer<'lng> {
+impl<'lng> LayerObj<'lng> {
     fn new(fan_in: Dimension, fan_out: Dimension, layer: LAYER, activation: impl Activation + 'lng, name: Option<&'static str>) -> Self {
         if !layer.check_size(fan_in) {
             panic!("\n| vector and fan_in length mismatch!\n| at layer '{}', got {} size vector, expect {}\n", name.unwrap(), layer.get_len(), fan_in);
         }
-        Layer {
+        LayerObj {
             name: name.unwrap(),
-            neurons: Layer::init_neurons(fan_in, fan_out, &layer),
+            neurons: LayerObj::init_neurons(fan_in, fan_out, &layer),
             fan_in: fan_in,
             fan_out: fan_out,
             activation: Box::new(activation),
@@ -251,26 +253,13 @@ fn main()
 {
     let input = vec![0.1, 0.2, 0.5, 0.8, 0.7, 0.7, 0.2, 0.4];
     let output = vec![0.1, 0.2, 0.5, 0.8, 0.7, 0.7, 0.2, 0.4];
-    let mut new_model = Model::new("test", 0.1);
-    new_model.add_layer(8, 9, IN(input), Sigmoid, Some("input"));
-    new_model.add_layer(9, 4, HIDDEN, Sigmoid, Some("input"));
-    new_model.add_layer(4, 3, HIDDEN, Sigmoid, Some("input"));
-    new_model.add_layer(3, 8, HIDDEN, Sigmoid, Some("input"));
-    new_model.add_layer(8, 0, OUT(output), END, Some("output"));
+    let mut new_model = Model::new("test");
 
-    println!("{}", new_model.layers[0].activation.feed_forward(3.));
-    for i in (0..500) {
-        // if i % 10 == 0 && 0 != i {
-            println!("{:0} epoch, loss: {}", i, new_model.cost);
-        // }
-        let bp = new_model.cost;
-        new_model.forward_propagation();
-        // if bp < new_model.cost && bp != 0. {
-        //     println!("over");
-        //     break
-        // };
-        new_model.back_propagation();
-    }
+    new_model.add_layer(8, 4, IN(input), Sigmoid, Some("input"));
+    new_model.add_layer(4, 8, HIDDEN, Sigmoid, Some("input"));
+    new_model.add_layer(8, 0, OUT(output), END, Some("output"));
+    new_model.train(50, 0.2, true, 10);
+
     let mut w1 = Matrix::<f64>::new(3, 4);
     let mut w = Matrix::<f64>::new(3, 4);
     let mut a = Matrix::<f64>::new_scalar(4.);
