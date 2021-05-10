@@ -3,7 +3,7 @@
 // https://docs.rs/num/0.1.28/src/num/.cargo/registry/src/github.com-1ecc6299db9ec823/num-0.1.28/src/traits.rs.html#215-236
 //
 //
-
+// Remove Copy trait for implement Zero for Matrix
 pub trait Zero: Sized {
     fn zero() -> Self;
     fn is_zero(&self) -> bool;
