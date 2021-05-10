@@ -8,8 +8,8 @@
 // }
 use std::ops::{Add, Mul, Sub, Div};
 use std::fmt::{Display, Debug, Formatter, Result};
-use num_traits::{Zero};
 use crate::forfor;
+use crate::maths::custom_zero::Zero;
 
 // type DebugElement = Zero + Display + Copy;
 
@@ -34,31 +34,43 @@ impl<T> Debug for Element<T> where T: Zero + Display + Copy {
 }
 
 #[derive(Clone)]
-pub struct Matrix<T> {
+pub struct Matrix<T> where T: Zero {
     n: Vec<Vec<Element<T>>>,
     _nx: i64,
     _ny: i64,
 }
 
 impl<T> Matrix<T> where T: Clone + Zero {
+
+    #[inline]
     pub fn new(ny: i64, nx:i64) -> Matrix<T> {
         Matrix { n: (0..ny).map(|_| vec![Element::Zero; nx as usize]).collect(), _nx: nx, _ny: ny }
     }
+
+    #[inline]
     pub fn new_scalar(val: T) -> Matrix<T> {
         Matrix { n: vec![vec![Element::Num(val)]], _nx: 1, _ny: 1 }
     }
+
+    #[inline]
     pub fn is_scalar(&self) -> bool {
         self._nx == 1 && self._ny == 1
     }
+
+    #[inline]
     pub fn from_fn<F: Fn()->T>(init_fn: F, ny: i64, nx:i64) -> Matrix<T> {
         Matrix { n: (0..ny).map(|_| (0..nx).map(|_| Element::Num(init_fn())).collect()).collect(), _nx: nx, _ny: ny }
     }
+
+    #[inline]
     pub fn get(&self, y: i64, x: i64) -> T {
         match &self.n[y as usize][x as usize] {
             Element::Num(n) => n.clone(),
             Element::Zero => Zero::zero(),
         }
     }
+
+    #[inline]
     fn zero() -> Matrix<T> {
         Matrix::<T>::new(1, 1)
     }
@@ -69,9 +81,13 @@ impl<T> Matrix<T> where T: Clone + Zero {
             panic!("this is matrix");
         }
     }
+
+    #[inline]
     pub fn get_dim(&self) -> (i64, i64) {
         (self._nx, self._ny)
     }
+
+    #[inline]
     pub fn comp_dim_with(&self, shr: &Self) -> bool {
         self.get_dim() == shr.get_dim()
     }
@@ -114,15 +130,27 @@ impl<T> Matrix<T> where T: Clone + Zero {
             panic!("can't calculate with this");
         }
     }
+    pub fn comp_elem<F: Fn(T)->bool>(&self, cal_fn: F) -> bool {
+        forfor!(self._ny, y, self._nx, x, {
+            if !cal_fn(self.get(y, x)) {
+                return false
+            }
+        });
+        true
+    }
+    #[inline]
+    pub fn is_zero(&self) -> bool {
+        self.comp_elem(|x| x.is_zero())
+    }
     // pub fn derivative(&mut self) -> Matrix<f64> {
     // }
 }
 
-impl<T> Zero for Matrix<T> where T: Zero + Clone + Display + Copy {
+impl<T> Zero for Matrix<T> where T: Zero + Clone + Display {
+    #[inline]
     fn zero() -> Matrix<T> { Matrix::<T>::zero() }
     fn is_zero(&self) -> bool {
-        // TODO:impl this
-        true
+        self.comp_elem(|x| x.is_zero())
     }
 }
 
@@ -145,6 +173,7 @@ macro_rules! opt_impl {
     ($funcn:ident, $func:ident, $c:expr) => {
         impl<T> $funcn<Matrix<T>> for Matrix<T> where T: Clone + Copy + Zero + Display + $funcn<Output = T> {
             type Output = Self;
+            #[inline]
             fn $func(self, rhs: Self) -> Self {
                 Self::cal_with_scalar(self, rhs, $c)
             }
@@ -155,4 +184,3 @@ opt_impl!(Add, add, |a, b| a + b);
 opt_impl!(Mul, mul, |a, b| a * b);
 opt_impl!(Sub, sub, |a, b| a - b);
 opt_impl!(Div, div, |a, b| a / b);
-
