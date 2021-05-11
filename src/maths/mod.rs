@@ -1,7 +1,7 @@
 pub mod matrix;
 pub mod calculus;
 pub mod rand;
-pub mod custom_zero;
+pub mod c_num_traits;
 
 #[derive(Debug, Clone, Copy)]
 pub enum NumOrZeroF64 {
