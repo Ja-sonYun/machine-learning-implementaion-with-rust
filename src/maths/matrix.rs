@@ -64,11 +64,11 @@ impl<T> Matrix<T> where T: Clone + Zero + One {
         // Matrix { n: (0..) }
     }
 
-    fn _create_deeply<F: Fn()->T>(mat: Matrix<T>, l_d_shape: Vec<i64>, shape_size: usize, init_f: F) -> Matrix<T> {
-        if shape_size == 0 {
+    // fn _create_deeply<F: Fn()->T>(mat: Matrix<T>, l_d_shape: Vec<i64>, shape_size: usize, init_f: F) -> Matrix<T> {
+    //     if shape_size == 0 {
             
-        }
-    }
+    //     }
+    // }
 
     // pub fn zeros(dims: Vec<T>) -> Matrix<T> {
 
