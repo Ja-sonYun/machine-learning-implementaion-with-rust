@@ -2,6 +2,7 @@ use std::ops::{Add, Mul, Sub, Div, IndexMut, Index};
 use std::fmt::{Display, Debug, Formatter, Result};
 use crate::forfor;
 use crate::maths::c_num_traits::{Zero, One};
+use std::ptr;
 
 #[derive(Clone)]
 pub struct Matrix<T> where T: Zero + One + PartialEq + Copy + Display + Debug {
@@ -10,21 +11,26 @@ pub struct Matrix<T> where T: Zero + One + PartialEq + Copy + Display + Debug {
     __dimension: Vec<usize>,
     __depth: usize,
     __inited: bool,
+    ___cache: Vec<usize>,
     ___is_query_stacked: bool,
     ___last_query: Option<Vec<usize>>,
+    ___is_mutated: Option<Vec<usize>>,
 }
 
 impl<T> Matrix<T> where T: Zero + One + PartialEq + Copy + Display + Debug {
     #[inline]
     fn _new(__ndarray_size: usize, __ndarray: Vec<T>, __depth: usize, __dimension: Vec<usize>, __inited: bool) -> Matrix<T> {
+        // Matrix::<T>::_mapping(&__dimension, __depth);
         Matrix {
             __ndarray: __ndarray,
             __ndarray_size: __ndarray_size,
             __depth: __depth,
             __dimension: __dimension,
             __inited: __inited,
+            ___cache: Vec::new(),
             ___is_query_stacked: false,
             ___last_query: None,
+            ___is_mutated: None,
         }
     }
 
@@ -33,6 +39,13 @@ impl<T> Matrix<T> where T: Zero + One + PartialEq + Copy + Display + Debug {
         let mut array_size = 1;
         for a in _dimension.iter() { array_size *= a }
         Matrix::_new(array_size, Vec::<T>::with_capacity(array_size), _dimension.len(), _dimension, false)
+    }
+
+    pub fn fill_with(_dimension: Vec<usize>, _element: T) -> Matrix<T> {
+        if _dimension.len() == 0 { panic!("cannot create 0-dimension matrix") };
+        let mut array_size = 1;
+        for a in _dimension.iter() { array_size *= a }
+        Matrix::_new(array_size, vec![_element; array_size], _dimension.len(), _dimension, true)
     }
 
     fn _new_from_raw_vec(_dimension: Vec<usize>, ndarray: Vec<T>) -> Matrix<T> {
@@ -87,28 +100,11 @@ impl<T> Matrix<T> where T: Zero + One + PartialEq + Copy + Display + Debug {
     }
 
     pub fn zeros(_dimension: Vec<usize>) -> Matrix<T> {
-        let mut temp = Matrix::<T>::new(_dimension.clone());
-        temp._fill_with(T::zero());
-        temp
+        Matrix::<T>::fill_with(_dimension, T::zero())
     }
 
     pub fn ones(_dimension: Vec<usize>) -> Matrix<T> {
-        let mut temp = Matrix::<T>::new(_dimension.clone());
-        temp._fill_with(T::one());
-        temp
-    }
-
-    pub fn fill_with(_element: T, _dimension: Vec<usize>) -> Matrix<T> {
-        let mut temp = Matrix::<T>::new(_dimension);
-        temp._fill_with(_element);
-        temp
-    }
-
-    fn _fill_with(&mut self, _element: T) {
-        for _ in 0..self._ndarray_size() {
-            self.__ndarray.push(_element);
-        }
-        self.__inited = true;
+        Matrix::<T>::fill_with(_dimension, T::one())
     }
 
     fn _get_cell(&self, query: &mut Vec<usize>) -> Vec<T> {
@@ -141,6 +137,17 @@ impl<T> Matrix<T> where T: Zero + One + PartialEq + Copy + Display + Debug {
 
             Matrix::<T>::_new(part_area.1,new_array, dim_diff, new_dim, true)
         }
+    }
+
+    fn _get_dim_by_query(&self, _query_depth: usize) -> Vec<usize> {
+        let dim_diff = self._depth() - _query_depth;
+        let mut new_dim = vec![0; dim_diff];
+        new_dim.copy_from_slice(&self._dimension_r(_query_depth, self._depth()));
+        new_dim
+    }
+
+    pub fn mut_by(&mut self, query: Vec<usize>) {
+        self.___is_mutated = Some(query);
     }
 
     fn _borrow_partial(&self, query: Vec<usize>) -> Matrix<T> {
@@ -178,6 +185,25 @@ impl<T> Matrix<T> where T: Zero + One + PartialEq + Copy + Display + Debug {
         let index = self._get_index(&query);
         self._set_ndarray(index, val);
     }
+
+    // pub fn _mapping(_dimension: &Vec<usize>, _depth: usize) -> Vec<usize> {
+    //     let temp_vec = Vec::<usize>::with_capacity(_depth);
+    //     let mut index;
+    //     let mut tmp;
+    //     for i in 0.._depth - 1 {
+    //         tmp = 1;
+    //         for j in i+1.._depth {
+    //             tmp *= _dimension[j];
+    //         }
+    //         index += 
+    //         temp_vec.push()
+    //     }
+    //     _dimension.iter().map(|dim| {
+    //         for i in dim.._depth {
+    //             tmp *= 
+    //         }
+    //     }).collect()
+    // }
 
     #[inline]
     pub fn _get_index(&self, query: &Vec<usize>) -> usize {

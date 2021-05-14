@@ -34,43 +34,43 @@ use crate::maths::c_num_traits::{Zero, One};
 // }
 
 #[derive(Clone)]
-pub struct Matrix<T> where T: Zero + One {
+pub struct Matrix_d<T> where T: Zero + One {
     n: Vec<Vec<T>>,
     _shape: (i64, i64),
     _d_shape: Option<Vec<i64>>
 }
 
-impl<T> Matrix<T> where T: Clone + Zero + One {
+impl<T> Matrix_d<T> where T: Clone + Zero + One {
 
     #[inline]
-    pub fn new(ny: i64, nx:i64) -> Matrix<T> {
-        Matrix { n: (0..ny).map(|_| vec![T::zero(); nx as usize]).collect(), _shape: (ny, nx), _d_shape: None }
+    pub fn new(ny: i64, nx:i64) -> Matrix_d<T> {
+        Matrix_d { n: (0..ny).map(|_| vec![T::zero(); nx as usize]).collect(), _shape: (ny, nx), _d_shape: None }
     }
 
     // shape[0] -> y, 1 -> x, 2 -> z, 3 -> ...
-    pub fn zeros(d_shape: Vec<i64>) -> Matrix<T> {
+    pub fn zeros(d_shape: Vec<i64>) -> Matrix_d<T> {
         // y vector
         let mut shape_size = d_shape.len();
-        Matrix { n: vec![vec![T::zero(); shape_size]; d_shape[0] as usize], _shape:(0, d_shape[0]), _d_shape: None }
+        Matrix_d { n: vec![vec![T::zero(); shape_size]; d_shape[0] as usize], _shape:(0, d_shape[0]), _d_shape: None }
         // if shape_size > 0 {
         //     if shape_size == 1 {
-        //         Matrix { n: vec![vec![T::zero(); shape_size]; d_shape[0] as usize], _shape:(0, d_shape[0]), _d_shape: None }
+        //         Matrix_d { n: vec![vec![T::zero(); shape_size]; d_shape[0] as usize], _shape:(0, d_shape[0]), _d_shape: None }
         //     } else {
-        //         Matrix { n: vec![vec![T::zero(); shape_size]; d_shape[0] as usize], _shape:(0, d_shape[0]), _d_shape: None }
+        //         Matrix_d { n: vec![vec![T::zero(); shape_size]; d_shape[0] as usize], _shape:(0, d_shape[0]), _d_shape: None }
         //     }
         // } else {
-        //     Matrix { n: vec![vec![T::zero(); shape_size]; d_shape[0] as usize], _shape:(0, d_shape[0]), _d_shape: None }
+        //     Matrix_d { n: vec![vec![T::zero(); shape_size]; d_shape[0] as usize], _shape:(0, d_shape[0]), _d_shape: None }
         // }
-        // Matrix { n: (0..) }
+        // Matrix_d { n: (0..) }
     }
 
-    // fn _create_deeply<F: Fn()->T>(mat: Matrix<T>, l_d_shape: Vec<i64>, shape_size: usize, init_f: F) -> Matrix<T> {
+    // fn _create_deeply<F: Fn()->T>(mat: Matrix_d<T>, l_d_shape: Vec<i64>, shape_size: usize, init_f: F) -> Matrix_d<T> {
     //     if shape_size == 0 {
             
     //     }
     // }
 
-    // pub fn zeros(dims: Vec<T>) -> Matrix<T> {
+    // pub fn zeros(dims: Vec<T>) -> Matrix_d<T> {
 
     // }
 
@@ -78,8 +78,8 @@ impl<T> Matrix<T> where T: Clone + Zero + One {
     // pub fn new_d()
 
     #[inline]
-    pub fn new_scalar(val: T) -> Matrix<T> {
-        Matrix { n: vec![vec![val]], _shape: (1, 1), _d_shape: None }
+    pub fn new_scalar(val: T) -> Matrix_d<T> {
+        Matrix_d { n: vec![vec![val]], _shape: (1, 1), _d_shape: None }
     }
 
     #[inline]
@@ -98,8 +98,8 @@ impl<T> Matrix<T> where T: Clone + Zero + One {
     }
 
     #[inline]
-    pub fn from_fn<F: Fn()->T>(init_fn: F, ny: i64, nx:i64) -> Matrix<T> {
-        Matrix { n: (0..ny).map(|_| (0..nx).map(|_| init_fn()).collect()).collect(), _shape: (ny, nx), _d_shape: None }
+    pub fn from_fn<F: Fn()->T>(init_fn: F, ny: i64, nx:i64) -> Matrix_d<T> {
+        Matrix_d { n: (0..ny).map(|_| (0..nx).map(|_| init_fn()).collect()).collect(), _shape: (ny, nx), _d_shape: None }
     }
 
     #[inline]
@@ -108,8 +108,8 @@ impl<T> Matrix<T> where T: Clone + Zero + One {
     }
 
     #[inline]
-    fn zero() -> Matrix<T> {
-        Matrix::<T>::new(1, 1)
+    fn zero() -> Matrix_d<T> {
+        Matrix_d::<T>::new(1, 1)
     }
     pub fn s_get(&self) -> T {
         if self.is_scalar() {
@@ -143,14 +143,14 @@ impl<T> Matrix<T> where T: Clone + Zero + One {
     }
     pub fn elem_with_scalar<F: Fn(T, T)->T>(&self, with: T, cal_fn: F) -> Self {
         // TODO: Refactoring this, use map?
-        let mut temp = Matrix::<T>::new(self.y(), self.x());
+        let mut temp = Matrix_d::<T>::new(self.y(), self.x());
         forfor!(self.y(), y, self.x(), x, {
             temp.set(y, x, cal_fn(self.get(y, x), with.clone()));
         });
         temp
     }
     pub fn elemwise_cal<F: Fn(T, T)->T>(&self, with: Self, cal_fn: F) -> Self {
-        let mut temp = Matrix::<T>::new(self.y(), self.x());
+        let mut temp = Matrix_d::<T>::new(self.y(), self.x());
         forfor!(self.y(), y, self.x(), x, {
             temp.set(y, x, cal_fn(self.get(y, x), with.get(y, x)));
         });
@@ -179,28 +179,28 @@ impl<T> Matrix<T> where T: Clone + Zero + One {
     pub fn is_zero(&self) -> bool {
         self.comp_elem(|x| x.is_zero())
     }
-    // pub fn derivative(&mut self) -> Matrix<f64> {
+    // pub fn derivative(&mut self) -> Matrix_d<f64> {
     // }
 }
 
-impl<T> Zero for Matrix<T> where T: Zero + Clone + Display + One {
+impl<T> Zero for Matrix_d<T> where T: Zero + Clone + Display + One {
     #[inline]
-    fn zero() -> Matrix<T> { Matrix::<T>::zero() }
+    fn zero() -> Matrix_d<T> { Matrix_d::<T>::zero() }
     fn is_zero(&self) -> bool {
         self.comp_elem(|x| x.is_zero())
     }
 }
 
 // TODO: replace zero to one
-impl<T> One for Matrix<T> where T: Zero + Clone + Display + One {
+impl<T> One for Matrix_d<T> where T: Zero + Clone + Display + One {
     #[inline]
-    fn one() -> Matrix<T> { Matrix::<T>::zero() }
+    fn one() -> Matrix_d<T> { Matrix_d::<T>::zero() }
     fn is_one(&self) -> bool {
         self.comp_elem(|x| x.is_zero())
     }
 }
 
-impl<T> Display for Matrix<T> where T: Display + Zero + Clone + One {
+impl<T> Display for Matrix_d<T> where T: Display + Zero + Clone + One {
     fn fmt(&self, f: &mut Formatter) -> Result {
         let mut strg = "".to_owned();
         for y in 0..self.y() as usize {
@@ -218,7 +218,7 @@ impl<T> Display for Matrix<T> where T: Display + Zero + Clone + One {
 // implement matrix calculate
 macro_rules! opt_impl {
     ($funcn:ident, $func:ident, $c:expr) => {
-        impl<T> $funcn<Matrix<T>> for Matrix<T> where T: Clone + Copy + Zero + Display + $funcn<Output = T> + One {
+        impl<T> $funcn<Matrix_d<T>> for Matrix_d<T> where T: Clone + Copy + Zero + Display + $funcn<Output = T> + One {
             type Output = Self;
             #[inline]
             fn $func(self, rhs: Self) -> Self {
