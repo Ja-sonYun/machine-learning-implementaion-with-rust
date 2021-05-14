@@ -5,7 +5,7 @@ use crate::maths::c_num_traits::{Zero, One};
 use std::ptr;
 
 #[derive(Clone)]
-pub struct Matrix<T> where T: Zero + One + PartialEq + Copy + Display + Debug {
+pub struct Matrix<T> where T: Zero + One + PartialEq + Copy + Display + Debug + Mul<Output = T> {
     __ndarray: Vec<T>,
     __ndarray_size: usize,
     __dimension: Vec<usize>,
@@ -17,7 +17,12 @@ pub struct Matrix<T> where T: Zero + One + PartialEq + Copy + Display + Debug {
     ___is_mutated: Option<Vec<usize>>,
 }
 
-impl<T> Matrix<T> where T: Zero + One + PartialEq + Copy + Display + Debug {
+enum Element<T> {
+    Vector(Vec<T>, Box<Element<T>>),
+    Number(T)
+}
+
+impl<T> Matrix<T> where T: Zero + One + PartialEq + Copy + Display + Debug + Mul<Output = T> {
     #[inline]
     fn _new(__ndarray_size: usize, __ndarray: Vec<T>, __depth: usize, __dimension: Vec<usize>, __inited: bool) -> Matrix<T> {
         // Matrix::<T>::_mapping(&__dimension, __depth);
@@ -48,11 +53,13 @@ impl<T> Matrix<T> where T: Zero + One + PartialEq + Copy + Display + Debug {
         Matrix::_new(array_size, vec![_element; array_size], _dimension.len(), _dimension, true)
     }
 
-    fn _new_from_raw_vec(_dimension: Vec<usize>, ndarray: Vec<T>) -> Matrix<T> {
-        let mut temp = Matrix::<T>::new(_dimension);
-        temp._push_ndarray(ndarray);
-        temp
+    pub fn from(_dimension: Vec<usize>, ndarray: Vec<T>) -> Matrix<T> {
+        Matrix::_new(ndarray.len(), ndarray, _dimension.len(), _dimension, true)
     }
+
+    // pub fn from_vec(rows: Box::) {
+
+    // }
 
     pub fn new_scalar(value: T) -> Matrix<T> {
         Matrix::_new(1, vec![value; 1], 0, vec![1; 1], true)
@@ -150,22 +157,8 @@ impl<T> Matrix<T> where T: Zero + One + PartialEq + Copy + Display + Debug {
         self.___is_mutated = Some(query);
     }
 
-    fn _borrow_partial(&self, query: Vec<usize>) -> Matrix<T> {
-        let query_len = query.len();
-        if query_len == self._depth() {
-            // return single element
-            Matrix::<T>::new_scalar(self._ndarray(self._get_index(&query)))
-        } else {
-            let dim_diff = self._depth() - query_len;
-            let mut new_dim = vec![0; dim_diff];
-            new_dim.copy_from_slice(&self._dimension_r(query_len, self._depth()));
-
-            let part_area = self._get_offset(&query);
-            let mut new_array = vec![T::zero(); part_area.1];
-            new_array.copy_from_slice(&self._ndarray_r(part_area.0, part_area.0+part_area.1));
-
-            Matrix::<T>::_new(part_area.1, new_array, dim_diff, new_dim, true)
-        }
+    fn _borrow_partial(&self, query: Vec<usize>) {//-> Matrix<T> {
+        //TODO:
     }
 
 
@@ -217,6 +210,16 @@ impl<T> Matrix<T> where T: Zero + One + PartialEq + Copy + Display + Debug {
         }
         index
     }
+
+/////////////////////////////////////////
+//
+// CAL
+//
+
+    pub fn e_mul(&self, with: Self) -> Self {
+        self._cal_elemwise(with, |a, b| a * b)
+    }
+
 
 /////////////////////////////////////////
 //
@@ -286,7 +289,7 @@ impl<T> Matrix<T> where T: Zero + One + PartialEq + Copy + Display + Debug {
     }
 }
 
-impl<T> Display for Matrix<T> where T: Zero + One + PartialEq + Copy + Display + Debug {
+impl<T> Display for Matrix<T> where T: Zero + One + PartialEq + Copy + Display + Debug + Mul<Output = T> {
     // todo: formatting
     fn fmt(&self, f: &mut Formatter) -> Result {
         if self._ndarray_size() == 1 {
@@ -313,21 +316,21 @@ impl<T> Display for Matrix<T> where T: Zero + One + PartialEq + Copy + Display +
 
 
 // implement matrix calculate
-macro_rules! opt_impl {
-    ($funcn:ident, $func:ident, $c:expr) => {
-        impl<T> $funcn<Matrix<T>> for Matrix<T> where T: Zero + One + PartialEq + Copy + Display + Debug + $funcn<Output = T> {
-            type Output = Self;
-            #[inline]
-            fn $func(self, rhs: Self) -> Self {
-                self._cal_with_scalar(rhs, $c)
-            }
-        }
-    }
-}
-opt_impl!(Add, add, |a, b| a + b);
-opt_impl!(Mul, mul, |a, b| a * b);
-opt_impl!(Sub, sub, |a, b| a - b);
-opt_impl!(Div, div, |a, b| a / b);
+// macro_rules! opt_impl {
+//     ($funcn:ident, $func:ident, $c:expr) => {
+//         impl<T> $funcn<Matrix<T>> for Matrix<T> where T: Zero + One + PartialEq + Copy + Display + Debug + $funcn<Output = T> {
+//             type Output = Self;
+//             #[inline]
+//             fn $func(self, rhs: Self) -> Self {
+//                 self._cal_with_scalar(rhs, $c)
+//             }
+//         }
+//     }
+// }
+// opt_impl!(Add, add, |a, b| a + b);
+// opt_impl!(Mul, mul, |a, b| a * b);
+// opt_impl!(Sub, sub, |a, b| a - b);
+// opt_impl!(Div, div, |a, b| a / b);
 
 // impl<T> Index<usize> for Matrix<T> where T: Zero + One + PartialEq + Copy + Display + Debug {
 //     type Output = Matrix<T>;

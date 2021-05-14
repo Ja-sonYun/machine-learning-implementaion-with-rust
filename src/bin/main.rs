@@ -1,19 +1,20 @@
 extern crate ml;
 use ml::*;
-use tools::*;
+// use tools::*;
+use tools::test_tools::test_excution_time;
+use std::fmt::{Display, Debug, Formatter, Result};
 
-use time::OffsetDateTime;
 use ndarray::{IxDyn, ArrayD};
 
-use activations::*;
-use initializer::*;
-use cost::*;
+// use activations::*;
+// use initializer::*;
+// use cost::*;
 // use maths::matrix::*;
 use maths::n_matrix::*;
-use maths::matrix::Matrix_d;
-use layer::LAYER::*;
-use layer::*;
-use model::*;
+// use maths::matrix::Matrix_d;
+// use layer::LAYER::*;
+// use layer::*;
+// use model::*;
 
 fn main()
 {
@@ -31,16 +32,32 @@ fn main()
 
     // a.set(vec![1, 0, 2, 0], 2.);
     test_excution_time(|| {
-        let _ = Matrix::<f64>::ones(vec![1, 300]).get(vec![0, 2]);
+        let a = Matrix::<f64>::ones(vec![1, 5, 4, 5]).get(vec![0, 2, 3, 4]);
     });
 
     test_excution_time(|| {
-        let _ = ArrayD::<f64>::ones(IxDyn(&[1, 300]))[[0, 2]];
+        let _ = ArrayD::<f64>::ones(IxDyn(&[1, 5, 4, 5]))[[0, 2, 3, 4]];
     });
+
+    // let a = Matrix::<f64>::
     // let mut a = Matrix::<f64>::zeros(vec![100, 300, 100, 4, 5, 8, 8]);
     // println!("a: {}", a.get(vec![1, 0, 2, 0]));
 
+    test::<i64>(&[1, 2, 3, 4]);
 
+    let a = Matrix::<i64>::from(vec![1, 3],
+                                vec![1,
+                                     5,
+                                     9]);
+
+    let b = Matrix::<i64>::from(vec![1, 3],
+                                vec![1,
+                                     5,
+                                     9]);
+
+    let s = Matrix::<i64>::new_scalar(4);
+
+    println!("a: {}", a.e_mul(b));
 
     // a[1][0][2][0] = 2.;
     // let now2 = OffsetDateTime::now_utc();
@@ -60,15 +77,13 @@ fn main()
     // let mut y = Matrix::<f64>::fill_with(1., vec![2, 3]);
     // println!("a: {}", y.get(vec![0]));
 
-
 }
 
-fn test_excution_time<F: Fn()>(f: F) {
-    let now2 = OffsetDateTime::now_utc();
-    f();
-    // a[1][0][2][0] = 2.;
-    // println!("a: {}", a[1][0][2][0]);
-    println!("time: {:?}", OffsetDateTime::now_utc() - now2);
+use crate::maths::c_num_traits::{Zero, One};
+fn test<T: Debug + Copy + Zero>(index: &[T]) {
+    let mut a = vec![T::zero(); index.len()];
+    a.copy_from_slice(index);
+    println!("i {:?}", a);
 }
 
 // 2, 3, 4
