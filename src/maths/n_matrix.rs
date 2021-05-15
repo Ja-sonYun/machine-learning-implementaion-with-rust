@@ -4,13 +4,23 @@ use crate::maths::c_num_traits::{Zero, One};
 use std::cmp::{PartialEq};
 
 //
-//  1,  2,  3
-//  4,  5,  6
-//  7,  8,  9
+//  1,  2,  3          1,  2,  3,  4
+//  4,  5,  6    =>    5,  6,  7,  8
+//  7,  8,  9          9, 10, 11, 12
 //  10, 11, 12
 //
+// -> query [ 2, 3 ]
 //
-//
+fn caching_dim(dim: &Vec<usize>) -> Vec<usize> {
+    let mut tmp = 1;
+    let mut tmpv = vec![0;dim.len()];
+    tmpv[dim.len()-1] = 1;
+    for i in (1..dim.len()).rev() {
+        tmp *= dim[i];
+        tmpv[i-1] = tmp;
+    }
+    tmpv
+}
 
 #[derive(Clone)]
 pub enum Dimension {
@@ -31,9 +41,10 @@ impl Dimension {
 pub struct Matrix<T> where T: Zero + One + Copy {
     __ndarray: Vec<T>,
     __ndarray_size: usize,
-    __dimension: Vec<Dimension>,
+    __dimension: Vec<usize>,
     __depth: usize,
     __inited: bool,
+    __dim_block: Vec<usize>,
     ___is_query_stacked: bool,
     ___last_query: Option<Vec<usize>>,
     ___is_mutated: Option<Vec<usize>>,
@@ -47,7 +58,9 @@ impl<T> Matrix<T> where T: Zero + One + Copy {
             __ndarray,
             __ndarray_size,
             __depth,
-            __dimension: Dimension::vec_to_dims(__dimension),
+            __dim_block: caching_dim(&__dimension),
+            // __dimension: Dimension::vec_to_dims(__dimension),
+            __dimension,
             __inited,
             ___is_query_stacked: false,
             ___last_query: None,
@@ -213,15 +226,11 @@ impl<T> Matrix<T> where T: Zero + One + Copy {
 
     #[inline]
     pub fn _get_index(&self, query: &[usize]) -> usize {
-        let mut index = query[query.len() - 1];
-        for i in 0..query.len()-1 {
-            let mut tmp = 1;
-            for j in i+1..query.len() {
-                tmp *= self._dimension(j);
-            }
-            index += query[i] * tmp;
+        let mut i_ = 0;
+        for i in 0..query.len() {
+            i_ += self.__dim_block[i] * query[i];
         }
-        index
+        i_
     }
 
 /////////////////////////////////////////
@@ -339,9 +348,10 @@ impl<T> Debug for Matrix<T> where T: Zero + One + Copy + Display {
         }
         let mut strg = "".to_owned();
         strg.push_str(&format!("\ndimension: {:?}, depth: {}\n", self.__dimension, self.__depth));
-        for i in 0..self._ndarray_size() {
-            strg.push_str(&format!(" {} ", &self._ndarray(i)));
-        }
+        // for i in 0..self._ndarray_size() {
+        //     strg.push_str(&format!(" {} ", &self._ndarray(i)));
+        //     if 
+        // }
         write!(f, "{}", strg)
     }
 }

@@ -27,16 +27,34 @@ fn main()
     // new_model.add_layer(&SGD, 4, 8, HIDDEN, &Sigmoid, Some("input"));
     // new_model.add_layer(&SGD, 8, 0, OUT(output), &Sigmoid, Some("output"));
     // new_model.train(500, 0.2, true, 10);
+    //
+    //
+    let a = Matrix::<i64>::from(vec![3, 4], vec![1,  2,  3,  4,
+                                                 5,  6,  7,  8,
+                                                 9, 10, 11, 12]);
+    println!("  a = {}", a);
+    println!("   a.get() -> {}", a.get(vec![2, 1]));
 
     test_excution_time(|| {
-        let _ = Matrix::<f64>::ones(vec![1, 5, 4, 5]);
+        let _ = Matrix::<f64>::ones(vec![1, 5, 4, 5, 5, 5]).get(vec![0, 3, 2, 2, 2, 2]);
     });
 
     test_excution_time(|| {
-        let _ = ArrayD::<f64>::ones(IxDyn(&[1, 5, 4, 5]));
+        let _ = ArrayD::<f64>::ones(IxDyn(&[1, 5, 4, 5, 5, 5]))[[0, 3, 2, 2, 2, 2]];
     });
 
 }
+
+// fn caching_dim(dim: Vec<usize>) -> Vec<usize> {
+//     let mut tmp = 1;
+//     let mut tmpv = vec![0;dim.len()];
+//     tmpv[dim.len()-1] = 1;
+//     for i in (1..dim.len()).rev() {
+//         tmp *= dim[i];
+//         tmpv[i+1] = tmp;
+//     }
+//     tmpv
+// }
 
 use crate::maths::c_num_traits::{Zero, One};
 fn test<T: Debug + Copy + Zero>(index: &[T]) {
