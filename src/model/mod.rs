@@ -13,27 +13,27 @@ pub struct Model<'lng>
 {
     pub name: &'static str,
     pub layers: Vec<LayerObj>,
-    pub layers_actions: Vec<(Box<dyn Layer + 'lng>, Box<dyn Activation + 'lng>)>,
+    pub layers_actions: Vec<(&'lng dyn Layer<'lng>, &'lng dyn Activation<'lng>)>,
     pub layer_size: usize,
     pub lr: f64,                // learning rate
     pub cost: Error,            // total loss
-    pub cost_function: Box<dyn CostFunction + 'lng>,
-    pub w_initializer: Box<dyn WeightInitializer + 'lng>,
+    pub cost_function: &'lng dyn CostFunction,
+    pub w_initializer: &'lng dyn WeightInitializer,
 }
 
 impl<'lng> Model<'lng> {
-    pub fn new(name: &'static str, cost_function: impl CostFunction + 'lng, w_initializer: impl WeightInitializer + 'lng) -> Self {
-        Model { name: name, layers: Vec::new(), layers_actions: Vec::new(), layer_size: 0, lr: 0., cost: 0., cost_function: Box::new(cost_function), w_initializer: Box::new(w_initializer) }
+    pub fn new(name: &'static str, cost_function: &'lng impl CostFunction, w_initializer: &'lng impl WeightInitializer) -> Self {
+        Model { name: name, layers: Vec::new(), layers_actions: Vec::new(), layer_size: 0, lr: 0., cost: 0., cost_function: cost_function, w_initializer: w_initializer }
     }
 
-    fn push_layer(&mut self, layer_obj: LayerObj, layer_action: impl Layer + 'lng, activation: impl Activation + 'lng) {
-        self.layers_actions.push((Box::new(layer_action), Box::new(activation)));
+    fn push_layer(&mut self, layer_obj: LayerObj, layer_action: &'lng impl Layer<'lng>, activation: &'lng impl Activation<'lng>) {
+        self.layers_actions.push((layer_action, activation));
         self.layers.push(layer_obj);
-        self.layer_size = self.layer_size + 1;
+        self.layer_size += 1;
     }
 
-    pub fn add_layer(&mut self, layer_t: impl Layer + 'lng, fan_in: Dimension, fan_out: Dimension, layer: LAYER, activation: impl Activation + 'lng, name: Option<&'static str>) {
-        self.push_layer(new_layer_obj(fan_in, fan_out, layer, &self.w_initializer, name), layer_t, activation);
+    pub fn add_layer(&mut self, layer_t: &'lng impl Layer<'lng>, fan_in: Dimension, fan_out: Dimension, layer: LAYER, activation: &'lng impl Activation<'lng>, name: Option<&'static str>) {
+        self.push_layer(new_layer_obj(fan_in, fan_out, layer, self.w_initializer, name), layer_t, activation);
     }
 
     // param: epoch, learning rate, log, log interval
@@ -66,13 +66,13 @@ impl<'lng> Model<'lng> {
     fn forward_propagation(&mut self) {
         // loop layers
         for i in 0..(self.layer_size) {
-            self.layers_actions[i].0.feed_forward(&mut self.layers, i, &mut self.cost, &self.cost_function, &self.layers_actions[i].1);
+            self.layers_actions[i].0.feed_forward(&mut self.layers, i, &mut self.cost, self.cost_function, self.layers_actions[i].1);
         }
     }
 
     fn back_propagation(&mut self) {
         for i in (0..(self.layer_size-1)).rev() {
-            self.layers_actions[i].0.back_propagation(&mut self.layers, i, self.lr, &self.cost_function, &self.layers_actions[i].1);
+            self.layers_actions[i].0.back_propagation(&mut self.layers, i, self.lr, self.cost_function, self.layers_actions[i].1);
         }
     }
 

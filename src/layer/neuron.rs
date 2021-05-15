@@ -15,13 +15,13 @@ pub struct Neuron {
 }
 
 impl Neuron {
-    pub fn new<'lng>(x: NumOrZeroF64, bias: Bias, fan_in: Dimension, fan_out: Dimension, initializer: &Box<dyn WeightInitializer + 'lng>) -> Self {
+    pub fn new<'lng>(x: NumOrZeroF64, bias: Bias, fan_in: Dimension, fan_out: Dimension, initializer: &(dyn WeightInitializer + 'lng)) -> Self {
         Neuron {
             input: x,
             z: 0.,
             o: x.reveal(),
             weights: (0..fan_out).map(|_| initializer.initializer(fan_in, fan_out)).collect(),
-            bias: bias,
+            bias,
             loss: 0.,
             local_loss: (0..fan_out).map(|_| 0.).collect(),
         }

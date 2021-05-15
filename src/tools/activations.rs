@@ -1,11 +1,11 @@
-pub trait Activation {
+pub trait Activation<'lng> {
     fn feed_forward(&self, x: f64) -> f64;
     fn back_propagation(&self,x: f64) -> f64;
 }
 
 #[allow(non_camel_case_types)]
 pub struct Sigmoid;
-impl Activation for Sigmoid {
+impl<'lng> Activation<'lng> for Sigmoid {
     fn feed_forward(&self, x: f64) -> f64 {
         1. / (1. + (-x).exp())
     }
@@ -16,7 +16,7 @@ impl Activation for Sigmoid {
 
 #[allow(non_camel_case_types)]
 pub struct ReLU;
-impl Activation for ReLU {
+impl<'lng> Activation<'lng> for ReLU {
     fn feed_forward(&self, x: f64) -> f64 {
         if 0. < x {
             x
@@ -35,7 +35,7 @@ impl Activation for ReLU {
 
 #[allow(non_camel_case_types)]
 pub struct Leaky_ReLU;
-impl Activation for Leaky_ReLU {
+impl<'lng> Activation<'lng> for Leaky_ReLU {
     fn feed_forward(&self, x: f64) -> f64 {
         if 0. < x {
             x
@@ -54,7 +54,7 @@ impl Activation for Leaky_ReLU {
 
 #[allow(non_camel_case_types)]
 pub struct A_END;
-impl Activation for A_END {
+impl<'lng> Activation<'lng> for A_END {
     fn feed_forward(&self, _: f64) -> f64 {
         panic!("This won't be called normally. something is wrong!")
     }

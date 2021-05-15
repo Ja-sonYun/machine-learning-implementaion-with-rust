@@ -7,6 +7,7 @@ use crate::tools::activations::Activation;
 use crate::tools::cost::CostFunction;
 use crate::tools::initializer::WeightInitializer;
 
+#[allow(non_snake_case)]
 #[derive(Debug)]
 pub enum LAYER {
     IN(Vec<Weight>),
@@ -56,7 +57,7 @@ pub struct LayerObj
     pub _type: LAYER
 }
 
-fn init_neurons<'lng>(fan_in: Dimension, fan_out: Dimension, layer: &LAYER, initializer: &Box<dyn WeightInitializer + 'lng>) -> Vec<Neuron> {
+fn init_neurons<'lng>(fan_in: Dimension, fan_out: Dimension, layer: &LAYER, initializer: &(dyn WeightInitializer + 'lng)) -> Vec<Neuron> {
     let mut neurons: Vec<Neuron>;
     // if this layer is input or hidden,
     neurons = Vec::with_capacity(fan_in as usize);
@@ -67,28 +68,29 @@ fn init_neurons<'lng>(fan_in: Dimension, fan_out: Dimension, layer: &LAYER, init
     neurons
 }
 
-pub fn new_layer_obj<'lng>(fan_in: Dimension, fan_out: Dimension, layer: LAYER, initializer: &Box<dyn WeightInitializer + 'lng>, name: Option<&'static str>) -> LayerObj {
+pub fn new_layer_obj<'lng>(fan_in: Dimension, fan_out: Dimension, layer: LAYER, initializer: &(dyn WeightInitializer + 'lng), name: Option<&'static str>) -> LayerObj {
     if !layer.check_size(fan_in) {
         panic!("\n| vector and fan_in length mismatch!\n| at layer '{}', got {} size vector, expect {}\n", name.unwrap(), layer.get_len(), fan_in);
     }
     LayerObj {
         name: name.unwrap(),
         neurons: init_neurons(fan_in, fan_out, &layer, initializer),
-        fan_in: fan_in,
-        fan_out: fan_out,
+        fan_in,
+        fan_out,
         _type: layer
     }
 }
 
-pub trait Layer {
-    fn feed_forward<'lng>(&self, layers: &mut Vec<LayerObj>, i: usize, cost: &mut Weight, cost_f: &Box<dyn CostFunction + 'lng>, act_f: &Box<dyn Activation + 'lng>);
-    fn back_propagation<'lng>(&self, layers: &mut Vec<LayerObj>, i: usize, lr: Weight, cost_f: &Box<dyn CostFunction + 'lng>, act_f: &Box<dyn Activation + 'lng>);
+pub trait Layer<'lng> {
+    fn feed_forward(&self, layers: &mut Vec<LayerObj>, i: usize, cost: &mut Weight, cost_f: &(dyn CostFunction + 'lng), act_f: &(dyn Activation + 'lng));
+    fn back_propagation(&self, layers: &mut Vec<LayerObj>, i: usize, lr: Weight, cost_f: &(dyn CostFunction + 'lng), act_f: &(dyn Activation + 'lng));
 }
 
+#[allow(non_snake_case)]
 pub struct SGD;
-impl Layer for SGD {
+impl<'lng> Layer<'lng> for SGD {
     #[inline]
-    fn feed_forward<'lng>(&self, layers: &mut Vec<LayerObj>, i: usize, cost: &mut Weight, cost_f: &Box<dyn CostFunction + 'lng>, act_f: &Box<dyn Activation + 'lng>) {
+    fn feed_forward(&self, layers: &mut Vec<LayerObj>, i: usize, cost: &mut Weight, cost_f: &(dyn CostFunction + 'lng), act_f: &(dyn Activation + 'lng)) {
         //-------If the layer is last, calculate loss without feed forward-----
         if let LAYER::OUT(_) = layers[i]._type {
 
@@ -99,7 +101,7 @@ impl Layer for SGD {
             //--------Sum all local loss----------------------
             for n in 0..layers[i].neurons.len() {
                 let loss = cost_f.feed_forward(layers[i].neurons[n].input.reveal(), layers[i].neurons[n].o);
-                *cost = *cost + layers[i].neurons[n].set_loss(loss);
+                *cost += layers[i].neurons[n].set_loss(loss);
             }
             //------------------------------------------------
 
@@ -122,7 +124,7 @@ impl Layer for SGD {
                 for j in 0..layers[i].neurons.len() as usize {
                     // get_wx(k) will get weight * input, on current layer, that the neuron at
                     //  index i that heading to next neuron which is indexed at k
-                    weight_sum = layers[i].neurons[j].get_wx(k) + weight_sum;
+                    weight_sum += layers[i].neurons[j].get_wx(k);
                 }
                 //-------------------------------------------------------------
 
@@ -140,7 +142,9 @@ impl Layer for SGD {
 
     }
     #[inline]
-    fn back_propagation<'lng>(&self, layers: &mut Vec<LayerObj>, i: usize, lr: Weight, cost_f: &Box<dyn CostFunction + 'lng>, act_f: &Box<dyn Activation + 'lng>) {
+
+    #[allow(non_snake_case)]
+    fn back_propagation(&self, layers: &mut Vec<LayerObj>, i: usize, lr: Weight, cost_f: &(dyn CostFunction + 'lng), act_f: &(dyn Activation + 'lng)) {
         //--------Back propagation---------------------------------------------
         //--------When next layer is output------------------------------------
         if let LAYER::OUT(_) = layers[i+1]._type {
@@ -163,7 +167,7 @@ impl Layer for SGD {
                     layers[i].neurons[w].local_loss[n] = E_total__o * layers[i].neurons[w].o;
 
                     // update weight
-                    layers[i].neurons[w].weights[n] = layers[i].neurons[w].weights[n] - (lr * layers[i].neurons[w].local_loss[n]);
+                    layers[i].neurons[w].weights[n] -= lr * layers[i].neurons[w].local_loss[n];
                 }
 
             }
@@ -181,7 +185,7 @@ impl Layer for SGD {
                     layers[i].neurons[n].local_loss[w] = E_total * layers[i].neurons[n].o * h;
 
                     // and update weights, ( Wn - (lr * E_Wn) )
-                    layers[i].neurons[n].weights[w] = layers[i].neurons[n].weights[w] - (lr * layers[i].neurons[n].local_loss[w]);
+                    layers[i].neurons[n].weights[w] -= lr * layers[i].neurons[n].local_loss[w];
                 }
             }
         }

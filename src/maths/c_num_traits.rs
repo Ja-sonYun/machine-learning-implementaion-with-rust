@@ -81,5 +81,22 @@ one_impl!(i64, 1);
 #[cfg(has_i128)]
 one_impl!(i128, 1);
 
-one_impl!(f32, 1.0);
-one_impl!(f64, 1.0);
+// use std:
+
+macro_rules! one_f_impl {
+    ($t:ty, $i: ident, $v:expr) => {
+        impl One for $t {
+            #[inline]
+            fn one() -> $t {
+                $v
+            }
+            #[inline]
+            fn is_one(&self) -> bool {
+                (*self - 1.0).abs() < $i::EPSILON
+                // *self == $v
+            }
+        }
+    };
+}
+one_f_impl!(f32, f32, 1.0f32);
+one_f_impl!(f64, f64, 1.0f64);

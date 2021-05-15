@@ -27,11 +27,11 @@ impl<T> Matrix<T> where T: Zero + One + PartialEq + Copy + Display + Debug + Mul
     fn _new(__ndarray_size: usize, __ndarray: Vec<T>, __depth: usize, __dimension: Vec<usize>, __inited: bool) -> Matrix<T> {
         // Matrix::<T>::_mapping(&__dimension, __depth);
         Matrix {
-            __ndarray: __ndarray,
-            __ndarray_size: __ndarray_size,
-            __depth: __depth,
-            __dimension: __dimension,
-            __inited: __inited,
+            __ndarray,
+            __ndarray_size,
+            __depth,
+            __dimension,
+            __inited,
             ___cache: Vec::new(),
             ___is_query_stacked: false,
             ___last_query: None,
@@ -40,14 +40,14 @@ impl<T> Matrix<T> where T: Zero + One + PartialEq + Copy + Display + Debug + Mul
     }
 
     pub fn new(_dimension: Vec<usize>) -> Matrix<T> {
-        if _dimension.len() == 0 { panic!("cannot create 0-dimension matrix") };
+        if _dimension.is_empty() { panic!("cannot create 0-dimension matrix") };
         let mut array_size = 1;
         for a in _dimension.iter() { array_size *= a }
         Matrix::_new(array_size, Vec::<T>::with_capacity(array_size), _dimension.len(), _dimension, false)
     }
 
     pub fn fill_with(_dimension: Vec<usize>, _element: T) -> Matrix<T> {
-        if _dimension.len() == 0 { panic!("cannot create 0-dimension matrix") };
+        if _dimension.is_empty() { panic!("cannot create 0-dimension matrix") };
         let mut array_size = 1;
         for a in _dimension.iter() { array_size *= a }
         Matrix::_new(array_size, vec![_element; array_size], _dimension.len(), _dimension, true)
@@ -163,9 +163,9 @@ impl<T> Matrix<T> where T: Zero + One + PartialEq + Copy + Display + Debug + Mul
 
 
     // return  ( offset, length )
-    fn _get_offset(&self, query: &Vec<usize>) -> (usize, usize) {
+    fn _get_offset(&self, query: &[usize]) -> (usize, usize) {
         let mut length = 1;
-        let mut owned_query = query.clone();
+        let mut owned_query = query.to_owned();
         for i in (query.len()..self._depth()).rev() {
             owned_query.push(0);
             length *= self._dimension(i);
@@ -199,7 +199,7 @@ impl<T> Matrix<T> where T: Zero + One + PartialEq + Copy + Display + Debug + Mul
     // }
 
     #[inline]
-    pub fn _get_index(&self, query: &Vec<usize>) -> usize {
+    pub fn _get_index(&self, query: &[usize]) -> usize {
         let mut index = query[query.len() - 1];
         for i in 0..query.len()-1 {
             let mut tmp = 1;
