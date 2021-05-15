@@ -33,8 +33,8 @@ DONE :
    | 2  A.set(vec![0, 3, 2, 2, 2, 2], 3.);
    | 3  assert_eq!(A.get(vec![0, 3, 2, 2, 2, 2]), 3.);
    |------------------------------------------------------------
-   |- Element wise calcuation
-   |- Create Matrix from png Image even RGB -> vec![height, width, RGB]
+   |- Element wise calculation
+   |- Create Matrix from png Image -> vec![height, width, RGB]
    |   `- currently using png crate,  TODO: IDAT algorithm
    `- Create, Calculation with scalar, get, set, etc
  
