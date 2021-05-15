@@ -1,4 +1,3 @@
-pub mod matrix;
 pub mod n_matrix;
 pub mod calculus;
 pub mod rand;

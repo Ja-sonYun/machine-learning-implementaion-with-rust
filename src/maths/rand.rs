@@ -1,9 +1,9 @@
-use crate::maths::matrix::{Matrix_d};
+// use crate::maths::matrix::{Matrix_d};
 use crate::utils::types::Dimension;
 use rand::Rng;
-pub fn randn(n_input: Dimension, n_output: Dimension) -> Matrix_d<f64> {
-    Matrix_d::<f64>::from_fn(rand, n_input, n_output)
-}
+// pub fn randn(n_input: Dimension, n_output: Dimension) -> Matrix_d<f64> {
+//     Matrix_d::<f64>::from_fn(rand, n_input, n_output)
+// }
 pub fn rand() -> f64 {
     rand::thread_rng().gen::<f64>()
 }

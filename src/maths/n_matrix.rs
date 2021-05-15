@@ -42,6 +42,24 @@ pub struct Matrix<T> where T: Zero + One + Copy {
     ___is_mutated: Option<Vec<usize>>,
 }
 
+////////////////////////////////////////////////////////////////////////
+//
+// dimension => [ 3 ]           set/get => [ 2 ]
+//              x-'                          '-x
+//
+// dimension => [ 3, 4 ]        set/get => [ 2, 2 ]
+//              y-'  |                     y-'   `-x
+//                   `-x
+//
+// dimension => [ 3, 4, 5 ]     set/get => [ 2, 2, 2 ]
+//              y-'  |  '-z                y-'  |  '-z
+//                   `-x                      x-'
+//
+// dimension => [ 3, 4, 5, 6 ]  set/get => [ 2, 2, 2, 2 ]
+//              y-'  |  '-z `-k            y-'  |  |   `-k
+//                   `-x                      x-'  `-z
+//
+////////////////////////////////////////////////////////////////////////
 impl<T> Matrix<T> where T: Zero + One + Copy {
     #[inline]
     fn _new(__ndarray_size: usize, __ndarray: Vec<T>, __depth: usize, __dimension: Vec<usize>, __inited: bool) -> Matrix<T> {

@@ -12,9 +12,7 @@ use ndarray::{IxDyn, ArrayD};
 use activations::*;
 use initializer::*;
 use cost::*;
-use maths::matrix::*;
 use maths::n_matrix::*;
-use maths::matrix::Matrix_d;
 use layer::LAYER::*;
 use layer::*;
 use model::*;
@@ -47,9 +45,11 @@ fn main()
     });
 
     let num = create_matrix_from_image("src/32011.png");
+    println!("{}", num.get(vec![4, 13]));
     for i in 0..23 {
         println!("{}", num.get(vec![i]));
     }
+
 
     // let decoder = png::Decoder::new(File::open("src/32011.png").unwrap());
     // let (info, mut reader) = decoder.read_info().unwrap();
