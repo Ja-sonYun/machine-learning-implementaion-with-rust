@@ -3,14 +3,6 @@ use std::fmt::{Display, Debug, Formatter, Result};
 use crate::maths::c_num_traits::{Zero, One};
 use std::cmp::{PartialEq};
 
-//
-//  1,  2,  3          1,  2,  3,  4
-//  4,  5,  6    =>    5,  6,  7,  8
-//  7,  8,  9          9, 10, 11, 12
-//  10, 11, 12
-//
-// -> query [ 2, 3 ]
-//
 fn caching_dim(dim: &Vec<usize>) -> Vec<usize> {
     let mut tmp = 1;
     let mut tmpv = vec![0;dim.len()];
@@ -322,9 +314,8 @@ impl<T> Display for Matrix<T> where T: Zero + One + Copy + Display {
             return write!(f, "{}", self._ndarray(0))
         }
         let mut strg = "".to_owned();
-        strg.push_str(&format!("\ndimension: {:?}, depth: {}\n", self.__dimension, self.__depth));
         for i in 0..self._ndarray_size() {
-            strg.push_str(&format!(" {} ", &self._ndarray(i)));
+            strg.push_str(&format!(" {}", &self._ndarray(i)));
         }
 
         // let mut strg = "\n[".to_owned();

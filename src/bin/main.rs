@@ -4,6 +4,9 @@ use tools::*;
 use tools::test_tools::test_excution_time;
 use std::fmt::{Display, Debug, Formatter, Result};
 
+use std::fs::File;
+use reader::png::create_matrix_from_image;
+
 use ndarray::{IxDyn, ArrayD};
 
 use activations::*;
@@ -43,6 +46,17 @@ fn main()
         let _ = ArrayD::<f64>::ones(IxDyn(&[1, 5, 4, 5, 5, 5]))[[0, 3, 2, 2, 2, 2]];
     });
 
+    let num = create_matrix_from_image("src/32011.png");
+    for i in 0..23 {
+        println!("{}", num.get(vec![i]));
+    }
+
+    // let decoder = png::Decoder::new(File::open("src/32011.png").unwrap());
+    // let (info, mut reader) = decoder.read_info().unwrap();
+    // // Allocate the output buffer.
+    // let mut buf = vec![0; info.buffer_size()];
+    // reader.next_frame(&mut buf).unwrap();
+    // println!("decode{:?}", buf)
 }
 
 // fn caching_dim(dim: Vec<usize>) -> Vec<usize> {
