@@ -35,7 +35,7 @@ DONE :
    |------------------------------------------------------------
    |- Element wise calculation
    |- Create Matrix from png Image -> vec![height, width, RGB]
-   |   `- currently using png crate,  TODO: IDAT algorithm
+   |   `- currently using png crate to decode png,  TODO: IDAT algorithm
    `- Create, Calculation with scalar, get, set, etc
  
  - Model
