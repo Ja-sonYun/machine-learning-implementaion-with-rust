@@ -1,28 +1,45 @@
-use std::ops::{Add, Mul, Sub, Div, IndexMut, Index};
+use std::ops::{Add, Mul, Sub, Div};
 use std::fmt::{Display, Debug, Formatter, Result};
-use crate::forfor;
 use crate::maths::c_num_traits::{Zero, One};
-use std::ptr;
+use std::cmp::{PartialEq};
+
+//
+//  1,  2,  3
+//  4,  5,  6
+//  7,  8,  9
+//  10, 11, 12
+//
+//
+//
 
 #[derive(Clone)]
-pub struct Matrix<T> where T: Zero + One + PartialEq + Copy + Display + Debug + Mul<Output = T> {
+pub enum Dimension {
+    Not(usize),
+    Transpose(usize),
+}
+impl Dimension {
+    fn vec_to_dims(this: Vec<usize>) -> Vec<Dimension> {
+        let mut iter = this.iter();
+        (0..this.len()).map(|_| Dimension::Not(match iter.next() {
+            Some(val) => *val,
+            None => panic!("something went wrong")
+        })).collect()
+    }
+}
+
+#[derive(Clone)]
+pub struct Matrix<T> where T: Zero + One + Copy {
     __ndarray: Vec<T>,
     __ndarray_size: usize,
-    __dimension: Vec<usize>,
+    __dimension: Vec<Dimension>,
     __depth: usize,
     __inited: bool,
-    ___cache: Vec<usize>,
     ___is_query_stacked: bool,
     ___last_query: Option<Vec<usize>>,
     ___is_mutated: Option<Vec<usize>>,
 }
 
-enum Element<T> {
-    Vector(Vec<T>, Box<Element<T>>),
-    Number(T)
-}
-
-impl<T> Matrix<T> where T: Zero + One + PartialEq + Copy + Display + Debug + Mul<Output = T> {
+impl<T> Matrix<T> where T: Zero + One + Copy {
     #[inline]
     fn _new(__ndarray_size: usize, __ndarray: Vec<T>, __depth: usize, __dimension: Vec<usize>, __inited: bool) -> Matrix<T> {
         // Matrix::<T>::_mapping(&__dimension, __depth);
@@ -30,9 +47,8 @@ impl<T> Matrix<T> where T: Zero + One + PartialEq + Copy + Display + Debug + Mul
             __ndarray,
             __ndarray_size,
             __depth,
-            __dimension,
+            __dimension: Dimension::vec_to_dims(__dimension),
             __inited,
-            ___cache: Vec::new(),
             ___is_query_stacked: false,
             ___last_query: None,
             ___is_mutated: None,
@@ -82,15 +98,12 @@ impl<T> Matrix<T> where T: Zero + One + PartialEq + Copy + Display + Debug + Mul
     }
 
     fn _cal_with_scalar<F: Fn(T, T) -> T>(&self, with: Self, cal_fn: F) -> Self {
-        if with.is_scalar() {
-            let mut temp = Matrix::<T>::new(self._raw_dim());
-            for i in 0..self._ndarray_size() {
-                temp.__ndarray.push(cal_fn(self._ndarray(i), with._ndarray(0)));
-            }
-            temp
-        } else {
-            panic!("not scalar!")
-        }
+        let mut iter = self.__ndarray.iter();
+        let temp = Matrix::<T>::from(self._raw_dim(), (0..self.__ndarray_size).map(|_| cal_fn(match iter.next() {
+            Some(val) => *val,
+            None => panic!("something goes wrong!")
+        }, with._ndarray(0))).collect());
+        temp
     }
 
     pub fn cmp_dim_with(&self, with: &Self) -> bool {
@@ -213,16 +226,6 @@ impl<T> Matrix<T> where T: Zero + One + PartialEq + Copy + Display + Debug + Mul
 
 /////////////////////////////////////////
 //
-// CAL
-//
-
-    pub fn e_mul(&self, with: Self) -> Self {
-        self._cal_elemwise(with, |a, b| a * b)
-    }
-
-
-/////////////////////////////////////////
-//
 // GETTERS
 //
 
@@ -289,7 +292,21 @@ impl<T> Matrix<T> where T: Zero + One + PartialEq + Copy + Display + Debug + Mul
     }
 }
 
-impl<T> Display for Matrix<T> where T: Zero + One + PartialEq + Copy + Display + Debug + Mul<Output = T> {
+/////////////////////////////////////////
+//
+// CAL
+//
+// impl<T> Matrix<T> where T: Zero + One + Copy + Mul <Output = T>{
+//     pub fn e_mul(&self, with: Self) -> Self {
+//         self._cal_elemwise(with, |a, b| a * b)
+//     }
+
+//     // pub fn e_mul(&self, with: Self) -> Self {
+//     //     self._cal_elemwise(with, |a, b| a * b)
+//     // }
+// }
+
+impl<T> Display for Matrix<T> where T: Zero + One + Copy + Display {
     // todo: formatting
     fn fmt(&self, f: &mut Formatter) -> Result {
         if self._ndarray_size() == 1 {
@@ -314,23 +331,52 @@ impl<T> Display for Matrix<T> where T: Zero + One + PartialEq + Copy + Display +
     }
 }
 
+impl<T> Debug for Matrix<T> where T: Zero + One + Copy + Display {
+    // todo: formatting
+    fn fmt(&self, f: &mut Formatter) -> Result {
+        if self._ndarray_size() == 1 {
+            return write!(f, "{}", self._ndarray(0))
+        }
+        let mut strg = "".to_owned();
+        strg.push_str(&format!("\ndimension: {:?}, depth: {}\n", self.__dimension, self.__depth));
+        for i in 0..self._ndarray_size() {
+            strg.push_str(&format!(" {} ", &self._ndarray(i)));
+        }
+        write!(f, "{}", strg)
+    }
+}
+
+impl<T> PartialEq<Matrix<T>> for Matrix<T> where T: Zero + One + PartialEq + Copy {
+    fn eq(&self, other: &Self) -> bool {
+        self.__ndarray == other.__ndarray && self.__dimension == other.__dimension
+    }
+    fn ne(&self, other: &Self) -> bool {
+        self.__ndarray == other.__ndarray && self.__dimension == other.__dimension
+    }
+}
 
 // implement matrix calculate
-// macro_rules! opt_impl {
-//     ($funcn:ident, $func:ident, $c:expr) => {
-//         impl<T> $funcn<Matrix<T>> for Matrix<T> where T: Zero + One + PartialEq + Copy + Display + Debug + $funcn<Output = T> {
-//             type Output = Self;
-//             #[inline]
-//             fn $func(self, rhs: Self) -> Self {
-//                 self._cal_with_scalar(rhs, $c)
-//             }
-//         }
-//     }
-// }
-// opt_impl!(Add, add, |a, b| a + b);
-// opt_impl!(Mul, mul, |a, b| a * b);
-// opt_impl!(Sub, sub, |a, b| a - b);
-// opt_impl!(Div, div, |a, b| a / b);
+macro_rules! opt_impl {
+    ($funcn:ident, $func:ident, $c:expr) => {
+        impl<T> $funcn<Matrix<T>> for Matrix<T> where T: Zero + One + PartialEq + Copy + Display + Debug + $funcn<Output = T> {
+            type Output = Self;
+            #[inline]
+            fn $func(self, rhs: Self) -> Self {
+                if self.cmp_dim_with(&rhs) {
+                    self._cal_elemwise(rhs, $c)
+                } else if rhs.is_scalar() || self.is_scalar() {
+                    self._cal_with_scalar(rhs, $c)
+                } else {
+                    panic!("mismatch dimensions, cannot calcuate");
+                }
+            }
+        }
+    }
+}
+opt_impl!(Add, add, |a, b| a + b);
+opt_impl!(Mul, mul, |a, b| a * b);
+opt_impl!(Sub, sub, |a, b| a - b);
+opt_impl!(Div, div, |a, b| a / b);
 
 // impl<T> Index<usize> for Matrix<T> where T: Zero + One + PartialEq + Copy + Display + Debug {
 //     type Output = Matrix<T>;

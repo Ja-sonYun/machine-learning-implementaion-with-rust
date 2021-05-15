@@ -4,6 +4,7 @@ pub mod calculus;
 pub mod rand;
 pub mod c_num_traits;
 pub mod macros;
+pub mod vector;
 
 #[derive(Debug, Clone, Copy)]
 pub enum NumOrZeroF64 {
