@@ -1,7 +1,7 @@
 TODO : 
  - Matrix
    |- Transpose
-   |- Concatenate
+   |- Concatenate and other calculations
    `- Non element wise multiply ?
 
  - Layer
