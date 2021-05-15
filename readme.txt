@@ -7,6 +7,7 @@ TODO :
  - Layer
    |- SGD
    `- Use matrix
+      `- weight initializers
   
  - PNG decoder
    `- IDAT decode algorithm
