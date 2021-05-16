@@ -1,4 +1,4 @@
-For Study
+An attempt to create Machine Learning Library from first for study
 ---------
 ,-------------------------------------------------------------------------
 | 1  let input = vec![0.1, 0.2, 0.5, 0.8];
