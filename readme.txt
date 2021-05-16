@@ -1,3 +1,23 @@
+
+,-------------------------------------------------------------------------
+| 1  let input = vec![0.1, 0.2, 0.5, 0.8];
+| 2  let output = vec![0.56, 0.5, 0.93, 0.6, 0.23, 0.654, 0.2, 0.1];
+| 3  let mut new_model = Model::new("test", &MSE, &he_initializer);
+| 4  new_model.add_layer(&SGD, 4, 4, IN(input), &Sigmoid, Some("input"));
+| 5  new_model.add_layer(&SGD, 4, 4, HIDDEN, &Sigmoid, Some("input"));
+| 6  new_model.add_layer(&SGD, 4, 8, HIDDEN, &Sigmoid, Some("input"));
+| 7  new_model.add_layer(&SGD, 8, 0, OUT(output), &Sigmoid, Some("output"));
+| 8  new_model.train(100, 0.2, true, 20);
+|------------OUTPUT----------------------------------------------------
+|  0 step, loss: 0.8380310284839548
+| 20 step, loss: 0.573779936458767
+| 40 step, loss: 0.27056526242049006
+| 60 step, loss: 0.12288962559780128
+| 80 step, loss: 0.06884584321349119
+`---------------------------------------------------------------------
+
+
+
 TODO : 
  - Matrix
    |- Transpose
@@ -83,24 +103,6 @@ DONE :
    | 3      fn back_propagation(&self, x:f64) -> f64 { }
    | 4  }
    `-------------------------------------------------------------------------
-
-
-,-------------------------------------------------------------------------
-| 1  let input = vec![0.1, 0.2, 0.5, 0.8];
-| 2  let output = vec![0.56, 0.5, 0.93, 0.6, 0.23, 0.654, 0.2, 0.1];
-| 3  let mut new_model = Model::new("test", &MSE, &he_initializer);
-| 4  new_model.add_layer(&SGD, 4, 4, IN(input), &Sigmoid, Some("input"));
-| 5  new_model.add_layer(&SGD, 4, 4, HIDDEN, &Sigmoid, Some("input"));
-| 6  new_model.add_layer(&SGD, 4, 8, HIDDEN, &Sigmoid, Some("input"));
-| 7  new_model.add_layer(&SGD, 8, 0, OUT(output), &Sigmoid, Some("output"));
-| 8  new_model.train(100, 0.2, true, 20);
-|------------OUTPUT----------------------------------------------------
-|  0 step, loss: 0.8380310284839548
-| 20 step, loss: 0.573779936458767
-| 40 step, loss: 0.27056526242049006
-| 60 step, loss: 0.12288962559780128
-| 80 step, loss: 0.06884584321349119
-`---------------------------------------------------------------------
 
 
   
